@@ -6,7 +6,7 @@
 
 * [Js](/wudi/javascript.md)
 
-* [ES6](/wudi/ES6.md)
+* [Js(ES6)](/wudi/ES6.md)
 
 * [TypeScript](/wudi/typescript.md)
 
