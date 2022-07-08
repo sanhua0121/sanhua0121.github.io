@@ -22,6 +22,8 @@
 
 * [Axios](wudi/axios.md)
 
+* [Threejs](wudi/three.js%26d3.js.md)
+
 * [浏览器原理](wudi/%E6%B5%8F%E8%A7%88%E5%99%A8.md)
 
 * [计算机网络](wudi/%E7%BD%91%E7%BB%9C.md)
