@@ -608,23 +608,17 @@ console.log(temp);
 
 - `Proxy` 用于修改某些操作的默认行为，等同于在语言层面做出修改，所以属于一种“元编程”（`meta programming`），即对编程语言进行编程。可以理解成，在目标对象之前架设一层“拦截”，外界对该对象的访问，都必须先通过这层拦截，因此提供了一种机制，可以对外界的访问进行过滤和改写。
 
-1. 将 `Proxy` 对象，设置到`object.proxy`属性，从而可以在`object`对象上调用。
+1. 将 `Proxy` 对象，设置到`object.proxy`属性，从而可以在`object`对象上调用
 
-```js
-const object = { proxy: new Proxy(target, handler) };
-```
+#### vue3 使用 Proxy 替换 defineProperty
 
-1. 使用`Proxy`对象
+-  `Object.defineProperty`
+  1. `Object.defineProperty`**无法监控到数组下标的变化**，导致直接通过数组的下标给数组设置值，不能实时响应。经过vue内部处理后可以使用以下几种方法来监听数组`push()`、`pop()`、`shift()`、`unshift()`、`splice()`、`sort()`、`reverse()`，由于只针对了以上八种方法进行了`hack`处理,所以其他数组的属性也是检测不到的，还是具有一定的局限性。
+  2. `Object.defineProperty`**只能劫持对象的属性**,因此我们需要对每个对象的**每个属性进行遍历**。
+- Proxy
 
-```js
-const proxy = new Proxy({}, {
-  get: function(target, propKey) {
-    return 'detanx';
-  }
-});
-
-obj.name // 'detanx'
-```
+  1. 可以劫持整个对象，并返回一个新对象。
+  2. 有 `13` 种劫持操作。
 
 `Proxy` 支持的拦截操作一览，一共 `13` 种
 
@@ -641,83 +635,6 @@ obj.name // 'detanx'
 11. `setPrototypeOf(target, proto)`：拦截`Object.setPrototypeOf(proxy, proto)`，返回一个布尔值。如果目标对象是函数，那么还有两种额外操作可以拦截。
 12. `apply(target, object, args)`：拦截 `Proxy` 实例作为函数调用的操作，比如`proxy(...args)`、`proxy.call(object, ...args)`、`proxy.apply(...)`。
 13. `construct(target, args)`：拦截 `Proxy` 实例作为构造函数调用的操作，比如`new proxy(...args)`。
-
-##### get()
-
-- 拦截某个属性的读取操作，可以接受三个参数，依次为目标对象、属性名和 `Proxy` 实例本身（**严格地说，是操作行为所针对的对象**），其中最后一个参数可选。
-
-```js
-const proxy = new Proxy({}, {
-  get(target, propertyKey [, receiver]) {
-    return target[propertyKey];
-  }
-});
-```
-
-- 如果一个属性不可配置（`configurable`）且不可写（`writable`），则 `Proxy`不能修改该属性，否则通过 `Proxy` 对象访问该属性会报错。
-
-```js
-const target = Object.defineProperties({}, {
-  foo: {
-    value: 123,
-    writable: false,
-    configurable: false
-  },
-});
-
-const handler = {
-  get(target, propKey) {
-    return 'abc';
-  }
-};
-
-const proxy = new Proxy(target, handler);
-
-proxy.foo
-// TypeError: Invariant check failed
-```
-
-##### set()
-
-- `set`方法用来拦截某个属性的赋值操作，可以接受四个参数，依次为目标对象、属性名、属性值和 `Proxy` 实例本身，其中最后一个参数可选。
-
-```js
-let prxyo = new Proxy({}, {
-  set(target, propertyKey, value [, receiver]) {
-    return target[propertyKey];
-  }
-});
-```
-
-- **如果目标对象自身的某个属性，不可配置（`configurable`）且不可写（`writable`），那么`set`方法将不起作用。**
-
-```js
-const obj = {};
-Object.defineProperty(obj, 'foo', {
-  value: 'bar',
-  writable: false,
-});
-
-const handler = {
-  set: function(obj, prop, value, receiver) {
-    obj[prop] = 'baz';
-  }
-};
-
-const proxy = new Proxy(obj, handler);
-proxy.foo = 'baz';
-proxy.foo // "bar"
-```
-
-#### vue3 使用 Proxy 替换 defineProperty
-
--  `Object.defineProperty`
-  1. `Object.defineProperty`**无法监控到数组下标的变化**，导致直接通过数组的下标给数组设置值，不能实时响应。经过vue内部处理后可以使用以下几种方法来监听数组`push()`、`pop()`、`shift()`、`unshift()`、`splice()`、`sort()`、`reverse()`，由于只针对了以上八种方法进行了`hack`处理,所以其他数组的属性也是检测不到的，还是具有一定的局限性。
-  2. `Object.defineProperty`**只能劫持对象的属性**,因此我们需要对每个对象的**每个属性进行遍历**。
-- Proxy
-
-  1. 可以劫持整个对象，并返回一个新对象。
-  2. 有 `13` 种劫持操作。
 
 #### Reflect
 
@@ -1158,7 +1075,7 @@ function *createIterator(items) {
 
 ### 1.原型链
 
-![JavaScript原型关系图](https://p1-jj.byteimg.com/tos-cn-i-t2oaga2asx/gold-user-assets/2018/11/4/166dee0c1854fab5~tplv-t2oaga2asx-zoom-in-crop-mark:1304:0:0:0.awebp)
+![JavaScript原型关系图](https://s2.loli.net/2022/07/09/J76ImxyMq2eZVlU.webp)
 
 在JavaScript中是使用**构造函数来新建一个对象**的，每一个**构造函数的内部都有一个 prototype 属性**，它的**属性值是一个对象**，这个对象包含了可以由该构造函数的**所有实例共享的属性和方法**。
 
@@ -1168,7 +1085,7 @@ function *createIterator(items) {
 
  JavaScript 对象是通过引用来传递的，创建的每个新对象实体中并没有一份属于自己的原型副本。当修改原型时，与之相关的对象也会继承这一改变
 
-![img](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/c68fcad75ea54d62a9404aa02cafc65c~tplv-k3u1fbpfcp-zoom-in-crop-mark:1304:0:0:0.awebp)
+![img](https://s2.loli.net/2022/07/09/DqP5sBKaXltSfOv.webp)
 
 
 
@@ -1210,7 +1127,7 @@ console.log(Object.getPrototypeOf(person1) == Person.prototype); // true
 
 ```
 
-![img](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/300750faa54e4872bfdd1a30850ee993~tplv-k3u1fbpfcp-zoom-in-crop-mark:1304:0:0:0.awebp)
+![img](https://s2.loli.net/2022/07/09/2WPNUXQ1hCYnR4c.webp)
 
 ### 2.原型修改、重写
 
@@ -2724,7 +2641,7 @@ ExecutionContext = {
 
 ### 2.什么是闭包
 
-![img](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/f116c4a9b8e64bbc9706249813a9b743~tplv-k3u1fbpfcp-zoom-in-crop-mark:1304:0:0:0.awebp)
+![img](https://s2.loli.net/2022/07/09/Eg9bfTomtLGnDUW.webp)
 
 闭包是一个函数在创建时允许该自身函数访问并操作该自身函数以外的变量时所创建的作用域。
 
