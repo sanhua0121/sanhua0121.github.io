@@ -40,6 +40,8 @@
 
 * [数据库原理](wudi/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%8E%9F%E7%90%86.md)
 
+* [Websocket原理](wudi/Websocket%E5%8E%9F%E7%90%86%E5%8F%8A%E5%85%B7%E4%BD%93%E4%BD%BF%E7%94%A8%EF%BC%88ws%2Bsocket.io%EF%BC%89%20-%20%E6%8E%98%E9%87%91.md)
+
 * [计算机基础](wudi/%E5%B8%B8%E8%A7%81%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80.md)
 
 * [代码题](wudi/%E4%BB%A3%E7%A0%81%E9%A2%98.md)

@@ -907,6 +907,189 @@ enum Direction {
 }
 ```
 
+## 接口
+
+当一个对象类型被多次使用时，有如下两种方式来来**描述对象**的类型，以达到复用的目的：
+
+1. 类型别名，type
+2. 接口，interface
+
+语法：
+
+```typescript
+interface 接口名  {属性1: 类型1, 属性2: 类型2}
+// 这里用 interface 关键字来声明接口
+interface IGoodItem  {
+	// 接口名称(比如，此处的 IPerson)，可以是任意合法的变量名称，推荐以 `I` 开头
+   name: string, price: number, func: ()=>string
+}
+
+// 声明接口后，直接使用接口名称作为变量的类型
+const good1: IGoodItem = {
+   name: '手表',
+   price: 200,
+   func: function() {
+       return '看时间'
+   }
+}
+const good2: IGoodItem = {
+    name: '手机',
+    price: 2000,
+    func: function() {
+        return '打电话'
+    }
+}
+```
+
+
+
+### interface和type的区别
+
+#### 相同点
+
+##### 都可以描述一个对象或者函数
+
+###### interface
+
+```
+interface User {
+  name: string
+  age: number
+}
+
+interface SetUser {
+  (name: string, age: number): void;
+}
+```
+
+###### type
+
+```
+type User = {
+  name: string
+  age: number
+};
+
+type SetUser = (name: string, age: number)=> void;
+```
+
+##### 都允许拓展（extends）
+
+interface 和 type 都可以拓展，并且两者并不是相互独立的，也就是说 interface 可以 extends type, type 也可以 extends interface 。 **虽然效果差不多，但是两者语法不同**。
+
+###### interface extends interface
+
+```
+interface Name { 
+  name: string; 
+}
+interface User extends Name { 
+  age: number; 
+}
+```
+
+###### type extends type
+
+```
+type Name = { 
+  name: string; 
+}
+type User = Name & { age: number  };
+```
+
+###### interface extends type
+
+```
+type Name = { 
+  name: string; 
+}
+interface User extends Name { 
+  age: number; 
+}
+```
+
+###### type extends interface
+
+```js
+interface Name { 
+  name: string; 
+}
+type User = Name & { 
+  age: number; 
+}
+
+```
+
+#### 不同点
+
+###### type 可以而 interface 不行
+
+- type 可以声明基本类型别名，联合类型，元组等类型
+
+```
+// 基本类型别名
+type Name = string
+
+// 联合类型
+interface Dog {
+    wong();
+}
+interface Cat {
+    miao();
+}
+
+type Pet = Dog | Cat
+
+// 具体定义数组每个位置的类型
+type PetList = [Dog, Pet]
+
+```
+
+- type 语句中还可以使用 typeof 获取实例的 类型进行赋值
+
+```
+// 当你想获取一个变量的类型时，使用 typeof
+let div = document.createElement('div');
+type B = typeof div
+```
+
+- 其他骚操作
+
+```
+type StringOrNumber = string | number;  
+type Text = string | { text: string };  
+type NameLookup = Dictionary<string, Person>;  
+type Callback<T> = (data: T) => void;  
+type Pair<T> = [T, T];  
+type Coordinates = Pair<number>;  
+type Tree<T> = T | { left: Tree<T>, right: Tree<T> };
+```
+
+###### interface 可以而 type 不行
+
+interface 能够声明合并
+
+```
+interface User {
+  name: string
+  age: number
+}
+
+interface User {
+  sex: string
+}
+
+/*
+User 接口为 {
+  name: string
+  age: number
+  sex: string 
+}
+*/
+```
+
+
+
 ## 高级类型
 
 ### 交叉类型（Intersection Types）
@@ -1644,3 +1827,221 @@ logClass1
 ## 总结
 
 ![ts](https://s2.loli.net/2022/04/10/79bEyc3j8ZMY4dr.jpg)
+
+## 类型体操
+
+[type-challenge](https://github.com/type-challenges/type-challenges)
+
+### 1.实现一个`pick`
+
+#### 题目
+
+不使用内置的`Pick<T, K>`泛型, 通过从 T 中选择属性 K 来构造类型
+
+例如
+
+```ts
+interface Todo {
+  title: string;
+  description: string;
+  completed: boolean;
+}
+
+type TodoPreview = MyPick<Todo, "title" | "completed">;
+
+const todo: TodoPreview = {
+  title: "Clean room",
+  completed: false,
+};
+```
+
+#### 答案
+
+```typescript
+type MyPick<T, Ks extends keyof T> = {
+  [K in Ks]: T[K];
+};
+```
+
+#### 分析
+
+从`T`中选择属性`K`, 那么`K`一定要是`T`的键.  
+所以需要对泛型参数进行约束, 即限制`Ks extends keyof T` => `Ks`(Keys) 一定要是 `T` 的 key 的子集.
+
+之后, 我们返回一个类型, 这个类型的 Key 来自于`K`, `K`是怎么来的呢,  
+我们遍历给定的 Keys(`[K in Ks]`), 将得到的 Ks 这个 union 类型的每一项记作 `K`.  
+对于每个`K`, 在我们返回的对象上追加一条属性, 该属性的名称为`K`, 值的类型为`T[K]`
+(从原始对象上得到这个 Key(`K`)对应的类型, 此操作与在 JS 对象上根据键获得值类型, 只不过是根据键获得值的**类型**)
+
+最后得到的这个类型即为从原类型上挑选出需要的 keys 的类型了
+
+#### 伪代码：
+
+```typescript
+function MyPick(T, Ks) { // Ks 是联合类型, 可看作js中的 Set 来遍历
+  if(Ks is not subset of (keyof T)) throw new Error() // Ks extends keyof T
+
+  const returnType = {};
+  for (let K of Ks) { // [K in Ks]
+    typeOf(returnType[K]) = typeOf(T[K]); //[K in Ks]: T[K];
+  }
+
+  return returnType
+}
+```
+
+
+
+### 2.实现一个`Readonly`
+
+实现内置的`Readonly<T>`泛型.  
+构造一个类型，并将 T 的所有属性设置为只读，这意味着无法重新对所构造类型的属性进行赋值
+
+#### 题目
+
+例如
+
+```ts
+interface Todo {
+  title: string;
+  description: string;
+}
+
+const todo: MyReadonly<Todo> = {
+  title: "Hey",
+  description: "foobar",
+};
+
+todo.title = "Hello"; // Error: cannot reassign a readonly property
+todo.description = "barFoo"; // Error: cannot reassign a readonly property
+```
+
+#### 答案
+
+```ts
+type MyReadonly<T> = {
+  readonly [K in keyof T]: T[K];
+};
+```
+
+#### 分析
+
+遍历`T`的每一个 key, 对每一个`K`添加
+[`readonly`描述符](https://www.typescriptlang.org/docs/handbook/typescript-in-5-minutes-func.html#readonly-and-const)
+, 而`K`对应的值的类型即为对象上原本的类型`T[K]`
+
+#### 伪代码:
+
+```typescript
+function MyReadonly(T) {
+  const returnType = {};
+
+  // 获得 T 上所有的 key
+  for (let K in T) {
+    returnType[K] = readonly(T[K]);
+  }
+
+  return returnType;
+}
+```
+
+### 3.实现一个`Tuple to Object`
+
+#### 题目
+
+给定数组，转换为对象类型，键/值必须在给定数组中
+
+例如
+
+```ts
+const tuple = ["tesla", "model 3", "model X"] as const;
+
+const result: TupleToObject<typeof tuple> = {
+  tesla: "tesla",
+  "model 3": "model 3",
+  "model X": "model X",
+};
+```
+
+#### 答案
+
+```ts
+type TupleToObject<T extends readonly (number | string | symbol)[]> = {
+  [V in T[number]]: V;
+};
+```
+
+#### 分析
+
+`TupleToObject`接受一个泛型参数 `T`, 首先这个`T`要是一个数组, 那么我们可以先写下以下代码
+
+```ts
+type TupleToObject<T extends any[]> = {
+  /* TODO */
+};
+```
+
+其次依题意, 这个数组是被`as const`修饰过的, 其作用在于将一个变量的类型限制为他的**值**, 且让他不可变, 例如
+
+```ts
+let a = "foo"; // type of a is *string*
+let b = "bar" as const; // type of a is *"bar"*
+
+let arr = ["foo", "bar"]; // type of arr is ["string", "string"]
+// type of arrAsConst is ["foo", "bar"]
+let arrAsConst = ["foo", "bar"] as const;
+```
+
+关于`as const`, 详见[杀手级的 TypeScript 功能：const 断言](https://juejin.cn/post/6844903848939634696).
+总之, 兼容这种类型, 必须修改代码为以下:
+
+```ts
+// `readonly` 与 `as const` 对应
+type TupleToObject<T extends readonly any[]> = {
+  /* TODO */
+};
+```
+
+再次, 该数组中的 value 最后会变成一个对象的属性, 而我们知道对象的属性只能接受`string | number | symbol`
+几种形式, 进一步约束泛型参数为
+
+```ts
+// 注意三种类型首字母均小写, 是 symbol 而不是 Symbol
+// 二者区别详见 https://stackoverflow.com/questions/14727044/what-is-the-difference-between-types-string-and-string
+type TupleToObject<T extends readonly (number | string | symbol)[]> = {
+  /* TODO */
+};
+```
+
+最后, 我们依次取出传入数组的每一项的值的**类型**, 我们知道对数组取值是使用下标进行访问得到的, 而下标
+都是`number`类型. 在 TS 类型编程中, 我们可以使用`T[number]`的写法来获得所有值的**类型**, 完整代码如下
+
+```ts
+type TupleToObject<T extends readonly (number | string | symbol)[]> = {
+  [V in T[number]]: V;
+};
+```
+
+#### 伪代码
+
+```typescript
+function TupleToObject(T) {
+  if(!(T extends Array<(number | string | symbol)>)) throw new Error()
+  if(T is not readonly) throw new Error()
+
+  const returnType = {};
+  T.forEach((value)=>{
+    /*
+     * 此处不是直接用 value 当作对象的键和值, 我们是在进行类型编程, 操作的都是类型
+     * \`\`\`ts
+     * var value = "foo"   // 此处"foo"是一个JS字符串
+     * typeOf(value)       // 得到的结果是 "foo", 此处 "foo" 是TS类型
+     * \`\`\`
+     */
+    returnType[typeOf(value)] = typeOf(value);
+  })
+
+  return returnType;
+}
+```
+
