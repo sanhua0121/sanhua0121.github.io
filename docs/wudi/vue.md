@@ -4004,6 +4004,226 @@ mapActions 生成对应方法  方法中会调用dispatch去联系actions  注�
 
 mapMutations 生成对应方法  方法中会调用commit去联系mutations 注意模块名
 
+### 6.vuex持久化
+
+vuex的 store 中的数据是保存在运行内存中的，当页面刷新时，页面会重新加载 vue 实例，vuex 里面的数据就会被重新赋值，这样就会出现页面刷新vuex中的数据丢失的问题。 如何解决浏览器刷新数据丢失问题呢？
+
+#### 方法一：
+
+全局监听，页面刷新的时候将 store 里 state 的值存到 sessionStorage 中，然后从sessionStorage 中获取，再赋值给 store ，并移除 sessionStorage 中的数据。在 app.vue 中添加以下代码：
+
+```js
+ created() {
+    window.addEventListener('beforeunload',()=>{
+       sessionStorage.setItem('list', JSON.stringify(this.$store.state))
+    })
+    
+    try{
+      sessionStorage.getItem('list') && this.$store.replaceState(Object.assign({},this.$store.state,JSON.parse(sessionStorage.getItem('list'))))
+    }catch(err) {
+      console.log(err);
+    }
+  
+    sessionStorage.removeItem("list");
+  }
+复制代码
+ 注意!!! storage 只能存储字符串的数据，对于 JS 中常用的数组或对象不能直接存储。但我们可以通过JSON 对象提供的 parse 和 stringify 方法将其他数据类型转化成字符串，再存储到storage中就可以了。
+```
+
+#### 方法二：
+
+安装 vuex-persistedstate 插件
+
+```
+1. npm install vuex-persistedstate -S //安装插件
+2. 在 store/index.js 文件中添加以下代码：
+import persistedState from 'vuex-persistedstate'
+const store = new Vuex.Store({
+ state:{},
+ getters:{},
+ ...
+ plugins: [persistedState()] //添加插件
+})
+复制代码
+注意!!! vuex-persistedstate 默认使用 localStorage 来存储数据，若要实现无痕浏览该如何实现呢？
+```
+
+这时候就需要使用 sessionStorage 进行存储，修改 plugins 中的代码
+
+```js
+plugins: [
+    persistedState({ storage: window.sessionStorage })
+]
+```
+
+### 7.Vuex为什么是响应式的
+
+#### `vuex`响应式原理
+
+一旦理解了`vue`的模板如何响应数据变化，那么`vuex`就好理解了
+
+`vuex`本质上是将`state`值绑定到了一个`vue`对象上，请看超简略源码：
+
+```js
+class Store {
+    constructor(options){
+        this.state = new Vue({
+            data:options.state
+        })
+    }
+}
+```
+
+于是当我们在`test.vue`中写出这种代码：
+
+```js
+<template>
+	<div>{{ $store.state.xx }}</div>
+</template>
+```
+
+`test.vue`实例`mount`的时候执行`updateComponent`，就会为`updateComponent`函数绑定一个依赖：`Store.state.xx`这个属性的`Dep`对象（暂时命名为`xxDep`,便于后续说明）
+
+那么一旦通过`commit`或其他手段更新了属性`Store.state.xx`，`xxDep`就会通知`updateComponent`所绑定的`Watcher`去执行`update`
+
+```
+Watcher.prototype.update = function(){
+	if (this.lazy) {
+    	...
+    } else {
+    	// 将此watcher加入队列，在nextick中执行
+        // 最终会执行到Watcher.getter，本例中也就是updateComponent
+		queueWatcher(this);
+	}
+}
+```
+
+从而最终又执行到了`updateComponent`去更新dom树，而在执行`updateComponent`过程中解析dom树时会重新获取`{{ $store.state.xx }}`，从而正确的更新了dom，实现了`store.state`到`vue`对象的绑定
+
+#### store.getters
+
+上面讲了`store.state`如何绑定到`vue`对象，那么`store.getters`呢？
+
+```
+var wrappedGetters = store._wrappedGetters;
+var computed = {};
+forEachValue(wrappedGetters, function (fn, key) {
+  computed[key] = partial(fn, store);
+  Object.defineProperty(store.getters, key, {
+    get: function () { return store._vm[key]; },
+    enumerable: true // for local getters
+  });
+});
+
+store._vm = new Vue({
+  data: {
+    $$state: state
+  },
+  computed: computed
+});
+复制代码
+```
+
+可以看到对于每个getters的值，最终放在两个地方：`store.getters`, `store`内部的`vue`对象上的`computed`属性，`computed`属性的双向绑定机制跟`data`属性类似，这里不多讲
+
+而通过`store.getters.key`获取的值根据以上代码，得到的是`store._vm[key]`,而这个就是`computed[key]`,因为`computed`属性都会绑定到`vm`对象上。所以`store.getters[key]===computed[key]`，是完完全全的同一个值
+
+#### 装载到`vue`
+
+`vue2`中使用`vuex`需要执行`vue.use(vuex)`。最终会执行到`vuex`的`install`方法
+
+```js
+// 初始化全局Vue对象时挂载store，并在跟元素上生成
+new Vue({
+    store,
+    ...
+})
+
+function install() {
+    Vue.mixin({
+        beforeCreate() {
+            if (this.$options.store) {
+                this.$store = this.$options.store // 这里对应根组件
+                return
+            }
+            this.$store = this.$parent.$store // 其他组件逐级向上取
+        } 
+    })
+}
+复制代码
+```
+
+通过生命周期给每个组件单独挂载`$store`，而不是直接`Vue.prototype.$store =`，这样可以防止声明多个`vuex`实例后覆盖
+
+```
+vue3`中挂载`vuex`要执行`app.use(store)`。最终会执行到`Store.prototype.install
+function install (app, injectKey) {
+    // globalProperties属性上挂载的属性可以在app下所有组件实例中访问到
+    app.config.globalProperties.$store = this;
+}
+```
+
+### 8.Vuex源码分析
+
+[Vuex源码分析](https://juejin.cn/post/6895980141466386440)
+
+#### Vuex的使用
+
+```js
+// store/index
+import Vue from 'vue'
+import Vuex from 'vuex'
+import cart from './modules/cart'
+import products from './modules/products'
+
+Vue.use(Vuex)
+
+export default new Vuex.Store({
+  state: {
+    rootState: 'rootState'
+  },
+  mutations: {
+    rootMutation (state, payload) {
+      state.value = payload
+    }
+  },
+  actions: {
+    rootAction ({ commit }, payload) {
+      commit('updateValue', payload)
+    }
+  },
+  getters: {
+    rootGetter: state => state.rootState
+  },
+  modules: {
+    cart,
+    products
+  },
+})
+
+```
+
+```js
+// app.js
+import Vue from 'vue'
+import store from './store'
+
+new Vue({
+  el: '#app',
+  store,
+  render: h => h(App)
+})
+
+```
+
+使用vuex有如下3个步骤；
+
+  **1. 显式地通过 Vue.use() 来安装 Vuex；**
+
+  **2. 通过 Vuex.Store 构造与实际业务相关的 store;**
+
+  **3. 在 Vue 的实例化时，添加 store 属性；**
+
 ## Vue3
 
 ### 1.Vue3有哪些新特性？
