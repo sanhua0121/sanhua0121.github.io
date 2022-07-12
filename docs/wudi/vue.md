@@ -4224,6 +4224,729 @@ new Vue({
 
   **3. 在 Vue 的实例化时，添加 store 属性；**
 
+#### 1.3、 如何解决下列问题
+
+  在对 Vuex 有了认知之后，带着以下几个问题，开始源码阅读之旅。
+
+  **1. Vuex 是如何运行的，组件实例上如何能通过 this.$store 获取 store 的实例？**
+
+  **2. 构建了怎样的单一状态树，如何实现模块化管理？**
+
+  **3. context 与 store 实例有什么区别？**
+
+  **4. 如何实现数据响应式？**
+
+  **5. 辅助类的函数式如何实现？**
+
+### 2、Vuex 的注册
+
+   Vuex 使用时，必须显示的调用  Vue.use() ，所有本质来讲 Vuex 其实就是 vue 的一个插件（plugin），插件注册时会调用插件的 install 方法；Vuex 的 install 方法如下：
+
+```JavaScript
+let Vue
+
+export function install (_Vue) {
+  // 如果 Vuex已经注册，则return
+  if (Vue && _Vue === Vue) {
+    // dev环境下warning忽视
+    if (__DEV__) {
+      console.error(
+        '[vuex] already installed. Vue.use(Vuex) should be called only once.'
+      )
+    }
+    return
+  }
+  Vue = _Vue
+  applyMixin(Vue)
+}
+复制代码
+```
+
+   定义了变量 Vue， _Vue 是插件注册是真正传入进来的 Vue 对象。首先判断 Vue 是否已经存在，避免 Vuex 重复注册，最后调用 applyMixin 方法：
+
+```JavaScript
+//applyMixin.js
+export default function (Vue) {
+  const version = Number(Vue.version.split('.')[0])
+
+  // 对 Vue 2x 及以上版本的处理
+  if (version >= 2) {
+    Vue.mixin({ beforeCreate: vuexInit })
+  } else {
+    // aop,改写Vue实例的_init方法
+    const _init = Vue.prototype._init
+    Vue.prototype._init = function (options = {}) {
+      options.init = options.init
+        ? [vuexInit].concat(options.init)
+        : vuexInit
+      _init.call(this, options)
+    }
+  }
+  
+  function vuexInit () {
+    const options = this.$options
+
+    if (options.store) {
+      this.$store = typeof options.store === 'function'
+        ? options.store()
+        : options.store
+    } else if (options.parent && options.parent.$store) {
+      this.$store = options.parent.$store
+    }
+  }
+  
+复制代码
+```
+
+   首先通过 version 判断当前 Vue 的版本，如果是 2.x 及以上的版本，通过 mixin 全局混入 hooks - beforeCreate ； 如果是 1.x 及以下的版本，则通过改写 _init 方法。两种方式的处理，目的都是在组件初始化前，调用 vuexInit 方法。此时的 this 对应的就是 Vue 的实例 （beforeCreate 方法执行时）， options 即 Vue 实例化时传入的参数，如果存在 store 属性的话，则将 this.$store 设置为 store 实例。
+
+   其中 store 就是调用 new Vuex.Store(options) 构造函数（Class）返回的对象，至于 store 中如何实现，下边篇幅会继续介绍。
+
+   **到这里就解释了问题1 ：Vuex 是如何运行的，组件实例上如何能通过 this.$store 获取 store 的实例？**
+
+   **Vuex 作为一个 Vue 的插件，通过 Vue.use(Vuex) 注册时，为组件添加初始化方法，在初始化方法中在当前组件的实例 （this）上添加 store属性，并将其指向newVuex.Store()返回的实例store，这是每个组件中都能通过this.store 属性，并将其指向 new Vuex.Store() 返回的实例 store ，这是每个组件中都能通过 this.store属性，并将其指向newVuex.Store()返回的实例store，这是每个组件中都能通过this.store 访问 store 实例的原因。**
+
+### 3、Vuex.Store 的实例化
+
+   store 是通过 new Vuex.Store(options) 实例化得到，Store 的代码如下，通过 Class 关键字实现了 Store 的类，并提供一系列的方法。
+
+```JavaScript
+export class Store {
+    
+   constructor (options = {}) {}
+   
+   get state (){}
+   
+   set state (v){}
+    
+   commit(){}
+   
+   dispatch(){}
+   
+   //......其他方法
+}
+
+复制代码
+```
+
+   其中 store 正是构造函数执行后返回的结果，store 中有我们常用的 commit、dispatch 方法，对于 state 属性，提供了 getter/setter 方法。这些方法的具体内容，稍后一一分析。
+
+   首先来看下构造函数中的关键代码：
+
+```
+    this._committing = false
+    this._actions = Object.create(null)  // 存储action，按照namespace的划分
+    this._actionSubscribers = []  // 存放 订阅 store 的 action
+    this._mutations = Object.create(null)  // 存储mutation，按照namespace的划分
+    this._wrappedGetters = Object.create(null)   // 存储getter，按照namespace的划分
+    this._modules = new ModuleCollection(options)
+    this._modulesNamespaceMap = Object.create(null)
+    this._subscribers = []  // 存放 订阅 store 的 mutation
+    this._watcherVM = new Vue()
+    this._makeLocalGettersCache = Object.create(null)
+
+    // bind commit and dispatch to self
+    const store = this
+    const { dispatch, commit } = this
+
+    // dispatch执行时，将内部的this指向当前的store
+    this.dispatch = function boundDispatch (type, payload) {
+      return dispatch.call(store, type, payload)
+    }
+    // commit执行时，将内部的this指向当前的store
+    this.commit = function boundCommit (type, payload, options) {
+      return commit.call(store, type, payload, options)
+    }
+
+    // strict mode
+    this.strict = strict
+
+    // 最顶层state： rootState
+    const state = this._modules.root.state
+
+    // init root module.
+    // this also recursively registers all sub-modules
+    // and collects all module getters inside this._wrappedGetters
+    // 初始化module ，全局的模块（root）
+    installModule(this, state, [], this._modules.root)
+    // initialize the store vm, which is responsible for the reactivity
+    // (also registers _wrappedGetters as computed properties)
+
+    resetStoreVM(this, state)
+
+复制代码
+```
+
+   上边的代码主要分三部分：1、初始化一些变量； 2、执行 installModule 方法； 3、执行 resetStoreVM 方法；
+
+   其中初始化中，重点需要关注的是 this._modules = new ModuleCollection(options)
+
+#### 3.1、模块化： ModuleCollection
+
+   这部分代码的目的是将 store 中的 module 数据维护成一个树状结构。在执行 new ModuleCollection(options)时，首先调用 ModuleCollection的构造函数，如下所示：
+
+```JavaScript
+export default class ModuleCollection {
+    constructor (rawRootModule) {
+        // 注册 root module - rawRootModule 为： new Vuex.Store(options) 中的options
+        this.register([], rawRootModule, false)
+    }
+}
+复制代码
+```
+
+   在构造函数中，调用了 regiter 方法，实现 store 的顶层 module 注册 （ Vuex 初始化的 options 可以理解为 rootModule ），register 方法如下：
+
+```JavaScript
+  // rawModule 结构为 {state,mutation,action} , 对于rootModule来说，就是Vuex.Store实例化时的参数 
+  
+  register (path, rawModule, runtime = true) {
+    // 返回newModule对象包含runtime、_children（存放嵌套的module）、_rawModule（当前module）、state（当前module的state） 四个属性
+    const newModule = new Module(rawModule, runtime)
+    
+    // 是否是顶层module（root），如果是则root内容指向，当前module内容。
+    if (path.length === 0) {
+      this.root = newModule
+    } else {
+      // path.slice(0, -1) : 返回一个新数组，去掉最后一个元素
+      // 返回当前module的上一级module(父级module)
+      const parent = this.get(path.slice(0, -1))
+      // 在父级module上的 _children 中添加当前module，key为当前module的定义时的key
+      parent.addChild(path[path.length - 1], newModule)
+    }
+
+    // 针对嵌套的modules的处理 - 循环递归处理
+    if (rawModule.modules) {
+      // rawChildModule： 子module， key：module的key值
+      forEachValue(rawModule.modules, (rawChildModule, key) => {
+        // 注册子模块
+        this.register(path.concat(key), rawChildModule, runtime)
+      })
+    }
+  }
+复制代码
+```
+
+   new Module() 返回的实例中包含4个属性
+
+- runtime
+- _children ：用于存放当前module的嵌套子 module
+- _rawModule ：当前module自身；
+- state ：当前 module 下的state 数据
+
+   回到 register 方法中，判断当前的 path 长度是否为 0  ；在构造函数中调用 register 方法时，传入的是 rootModule，path 是空数组。此时，将 this.root 设置为 rootModule；当 rootModule 中存在 modules 属性时，也即存在子 module 时，则循环子 module （rawModule.modules），递归（深度优先）调用 register 方法，此时参数：
+
+- path ： 子模块的moduleName （ 注册到 modules 中的 key 【moduleName】链路集合）
+- rawModule ：当前子模块
+
+   在递归执行 register 方法中，子module 同样经过 new Module 作用后，也返回了跟 rootModule 一样的格式；由于此时传入的 path 不为空，因此执行 else 分支，看下此时的 this.get 方法：
+
+```JavaScript
+ get (path) {
+    // 从root，逐层module调用getChild方法 -  获取对于key值得module
+    return path.reduce((module, key) => {
+      return module.getChild(key)
+    }, this.root)
+  }
+  
+复制代码
+```
+
+   get 方法通过数组的 reduce 方法遍历 path（实际上是 moduleName 链路集合） 链路中的最后一个module。
+
+   继续回到 register 方法， const parent = this.get(path.slice(0, -1)) 通过在 path 中剔除当前moduleName，则 path 链接集合实际上是从 root 到 parent 的 moduleName 的集合， 因此返回的就是当前 module 的 parentModule （parent）。通过执行 parent.addChild(path[path.length - 1], newModule)，将当前 module 添加到 parentModule （parent）的 _children 属性中。
+
+   结果循环递归之后，最终的 this._module 的结果如下，形成了以 moduleName 为链路的module 数，以 demo 为例：
+
+![image](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/49bc708633764664bd1c4ce2f0730344~tplv-k3u1fbpfcp-zoom-in-crop-mark:3024:0:0:0.awebp)
+
+#### 3.2、初始化： installModule
+
+   installModule 方法中主要完成 module 的一系列初始化，主要针对 module 的 state、getter、mutation、action 注册；又因为 store 中存在 modules，因此 module 中的 state、action 等也需要注册，这部分是通过递归调用 installModule 方法实现的，其中在 module 中，需要传入 context 属性，用于访问当前 module 的 state、 getter，对这部分的处理在 makeLocalContext 方法中实现；
+
+   为了更好的理解 module 设置 namespace 之后处理，我们先分析 action 、mutation 等模块的注册，然后在分析 context 的实现。
+
+##### 3.2.1、this._modules 中 state的处理；
+
+   对于state 的处理核心代码如下：
+
+```JavaScript
+ const isRoot = !path.length
+
+ if (!isRoot && !hot) {
+    // 获取当前module的父module的state的值 rootState
+    const parentState = getNestedState(rootState, path.slice(0, -1))
+    const moduleName = path[path.length - 1]
+    store._withCommit(() => {
+      // state的响应式处理： 构造的state通过Vue.set方法设置之后，就会变成响应式。
+      Vue.set(parentState, moduleName, module.state)
+    })
+  }
+  
+  // 其他代码
+  
+  module.forEachChild((child, key) => {
+    installModule(store, rootState, path.concat(key), child, hot)
+  })
+
+复制代码
+```
+
+   第一次调用 installModule 方法是，path 为空，则 isRoot 为 true，跳过 if 语句，递归调用 installModule 时，传入的 path 为当前 module 的 moduleName 链路集合，module 参数为当前的 module。此时执行 if 语句，同 module 注册（register ）一样，此处 getNestedState 也是获取 moduleName 链路上的最末端的 state，同理 path.slice(0, -1) 剔除了当前的 moduleName，因此返回的是父module 的state （parentState）。通过调用 Vue.set(parentState, moduleName, module.state) ，在 parentState 中添加 moduleName 的属性，value 值为当前 module 的 state。通过 Vue.set 是为了实现数据的响应式，保证子 module 中的 state 发生变化，parentModule 中的 state 响应变化。
+
+   由于第一次调用的传入的 module 是 store._modules.root ，因此之后的所有的递归操作都是基于这个入口操作的，也即这部分对应 state 的处理，最终都反应到了this._modules 上。
+
+![image](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/8d64028006444264b91473ae72db4550~tplv-k3u1fbpfcp-zoom-in-crop-mark:3024:0:0:0.awebp)
+
+##### 3.2.2、mutation的注册：registerMutation
+
+   在 installModule 方法遍历当前 module 下的 mutation 方法，并依次调用 registerMutation 方法来注册。同时通过递归来完成各个子模块的注册。核心代码如下：
+
+```JavaScript
+ //当前模块的moduleName的链路集合
+ const namespace = store._modules.getNamespace(path)
+
+ // 遍历注册module中的mutation - 根据module的 [nameSpace + key] 作为key来区分mutation
+  module.forEachMutation((mutation, key) => {
+    const namespacedType = namespace + key
+    registerMutation(store, namespacedType, mutation, local)
+  })
+  
+ //.....
+ module.forEachChild((child, key) => {
+    installModule(store, rootState, path.concat(key), child, hot)
+  })
+ 
+复制代码
+```
+
+   在 registerMutation 方法的代码如下：
+
+```JavaScript
+// 注册Mutation - mutation 按照（namespace + handelName） 维护在 store._mutation对象上
+function registerMutation (store, type, handler, local) {
+  const entry = store._mutations[type] || (store._mutations[type] = [])
+  entry.push(function wrappedMutationHandler (payload) {
+    // 注入了当前module下的state
+    handler.call(store, local.state, payload)
+  })
+}
+
+复制代码
+```
+
+   首先来看下 type 参数是什么？ 其中 namespace 为 moduleName 链接的集合形成的一个字符串 （例如：'cart/'）。 module.forEachMutation 方法遍历的 mutation 下的方法，因此 key 即为 mutation 下对应的方法名。因此 type 为 当前 module 的链路下 ( moduleName集合 + 方法名 )，例如 'cart/incrementItemQuantity'。 则所有的 mutation 都根据 type 值存储在 store._mutation 对象中。并在 handler 执行时，注入了当前 module 下的  state，这里的 local 就是当前 module 下的 context ；最终的数据结构如下：
+
+![image](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/ad4932f48b2c495881fa0b5e572ab25f~tplv-k3u1fbpfcp-zoom-in-crop-mark:3024:0:0:0.awebp)
+
+##### 3.2.3、action的注册：registerAction
+
+   action 的注册同 mutation 基本一致，最终的结果存储在 store._action 对象中，也是一组键值对，key 值仍旧是 (moduleName集合 + 方法名)，value 为对应的 action 下定义的方法体。
+
+```JavaScript
+// 注册Action - action 按照 type（namespace + handelName -- 形如： a/b/ ） 维护在 store._action对象上，
+// 并在执行时 注入了 context 和 root的属性
+function registerAction (store, type, handler, local) {
+  const entry = store._actions[type] || (store._actions[type] = [])
+  entry.push(function wrappedActionHandler (payload) {
+    // 注入了当前module的context（local）的属性，以及root （store）的属性
+    let res = handler.call(store, {
+      dispatch: local.dispatch,  // 赋值后， dispatch执行的时候，环境已经发布变化， 因此 dispatch 需要通过 call 绑定 store
+      commit: local.commit,
+      getters: local.getters,
+      state: local.state,
+      rootGetters: store.getters,
+      rootState: store.state
+    }, payload)
+    if (!isPromise(res)) {
+      res = Promise.resolve(res)
+    }
+      return res
+  })
+}
+复制代码
+```
+
+   action 的 handler 中注入了更多的参数，包括 context （local相关的）和 root （store） 的属性。并通过 promise 进行包装，这也意味着，dispatch 触发的action，可支持 promise 的处理。
+
+##### 3.2.4、getter的注册：registerGetter
+
+   getter 的注册同 mutation、action 也基本一致，不同的是 gettert 不允许重复注册。所有的 getter 都存储在 store._wrappedGetters 中， getter 的handler中注册了 state，getter，rootState，rootGetter 4个参数；
+
+##### 3.2.5、小结
+
+   state、mutation、action、getter 注册完成之后，最终的结果如下：
+
+![image](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/97d4b996553345d7bf7c746dc665af15~tplv-k3u1fbpfcp-zoom-in-crop-mark:3024:0:0:0.awebp)
+
+   **至此，就可以回答问题2：构建了怎样的单一状态树，如何实现模块化管理？**
+
+  **通过递归操作实现 state 、mutation、action、getter 的注册，最终将这些数据都存储到 store 实例中，根据各自的属性由 store 统一管理。**
+
+#### 3.3、context 构建：makeLocalContext
+
+   针对具体的 module，Vuex 在设计中给每个 module 提供一个 context 的属性。context 包含：dispatch 、commit、getter 、state 四个属性。
+
+- dispatch 和 commit：context 中提供的这两个方法本质还是调用 store 中对应的方法。以 dispatch 为例，核心代码如下：
+
+```JavaScript
+    dispatch: noNamespace ? store.dispatch : (_type, _payload, _options) => {
+      const args = unifyObjectStyle(_type, _payload, _options)
+      const { payload, options } = args
+      let { type } = args
+
+      // options 不存在 或者  options.root 不为ture，则标识从子模块中获取 action。否则从root中操作
+      if (!options || !options.root) {
+        type = namespace + type
+        if (__DEV__ && !store._actions[type]) {
+          console.error(`[vuex] unknown local action type: ${args.type}, global type: ${type}`)
+          return
+        }
+      }
+
+      return store.dispatch(type, payload)
+    }
+复制代码
+```
+
+   有上文分析可以，context.dispatch 方法被注入到 action 的第一个参数中，在 module 的 action 中如果需要调用当前 module 下的 action 时，通常这样写：`dispatch( 'actionName', payload )` ；但是在 action 注册时，所有的 module 下的 action 都存储到 store._action 对象中， 对应的 key 为各个 module 的 (moduleName集合 + 方法名) 拼接而成。如果开启了 namespace 的话，在 _action 对象中实际上找不到 ‘actionName’这个方法 （因为 _action 中这个方法名称是 moduleName的集合和方法名组合的 ）
+
+   到这里我们就明白了，context 中的 dispatch、commit 本质都是调用 store 的 dispatch、commit 方法，只不过在开启 namespace 之后，对 type 做了处理，拼接上了 namespace，以保证在 _action 对象中能找到对应的方法。
+
+- getter、state 属性：核心代码如下。通过 Object.defineProperties 为 getter 、state 添加了 get 方法， getter 通过 namespace （本质的是 moduleName 的集合） 寻找对应 module 下的 getter ，state 则是直接通过 path （本质也是 moduleName 的集合）逐层寻找对应 module 下的 state。
+
+```JavaScript
+Object.defineProperties(local, {
+    getters: {
+      get: noNamespace
+        ? () => store.getters
+        : () => makeLocalGetters(store, namespace)
+    },
+    state: {
+      get: () => getNestedState(store.state, path)
+    }
+复制代码
+```
+
+   state 的引用很好理解，这里主要来分析下 getter ， 为了更好的阐述这段代码，我们举例说明由，由上述分析可知，在 module 的 action 中注入了当前 module 的 getter， 假设存在一个名称为 number 的 getter ，我们在 action 中有如下应用：
+
+```
+ const num = getter.num
+复制代码
+```
+
+   这里涉及到了2个引用，第一个是 getter ，第二个是 num 。 getter 的 get 方法指向的是 makeLocalGetters 的调用，代码如下：
+
+```JavaScript
+function makeLocalGetters (store, namespace) {
+  if (!store._makeLocalGettersCache[namespace]) {
+    const gettersProxy = {}
+    const splitPos = namespace.length
+    Object.keys(store.getters).forEach(type => {
+      // skip if the target getter is not match this namespace
+      // 忽略 namespace 不匹配的方法 ，namespace：a/b/， getter: a/b/getterName
+      if (type.slice(0, splitPos) !== namespace) return
+
+      // extract local getter type
+      // 获取getterName
+      const localType = type.slice(splitPos)
+
+      // Add a port to the getters proxy.
+      // Define as getter property because
+      // we do not want to evaluate the getters in this time.
+      Object.defineProperty(gettersProxy, localType, {
+        get: () => store.getters[type],
+        enumerable: true
+      })
+    })
+    store._makeLocalGettersCache[namespace] = gettersProxy
+  }
+
+  return store._makeLocalGettersCache[namespace]
+}
+复制代码
+```
+
+   首先判断是否存在缓存，如果存在当前 getter 的缓存，则直接使用。如果不存在缓存时，则首先从 store.getter 中过滤出与当前 namespace 相关的 getter ，然后定义了一个 空对象，并通过 Object.defineProperty 为这个空对象设置 属性 - getter 的方法名，并为该属性设置 get 方法。
+
+   回到刚才的实例：经过两次 get 引用后，当前 getter.name 就从当前 store.getter 属性找到了 moduleName集合 + getterName 对应的 getter 方法了。通过 Object.defineProperty 方法接触，能够保证数据获取的拿到实时的数据。
+
+   至此可以解释 **问题3. context 与 store 实例有什么区别？**
+
+   **store 包含更多的属性，而 context 只有四个属性 commit、dispatch、state、getter ，其中 commit、dispatch 本质上还是 store.commit、 store.dispatch ；而 state 、getter 代表的是当前 module 下的 state 和 getter，但前提是 module 开启了namespaced 属性。如果没有开启 namespace， 实际上 mutation、action 、getter 等注册时的 key 值就不是 moduleName 的链路集合 +  方法名， 而是方法名本身。**
+
+### 4、数据响应式处理： resetStoreVM
+
+   之前的分析中，我们多次涉及到 store.state， store.getter ，这两个属性也多次注入到诸如 mutation、action 当中，如果这些数据不能做到响应式的话，那么功能就完全瘫痪了，那么 Vuex 是如何实现的。 这个功能主要是通过 resetStoreVM 方法实现，我们都知道 Vue 中的是响应式的处理数据的，Vuex 正式利用 Vue 这一特点来实现数据的响应式。核心代码如下：
+
+```JavaScript
+function resetStoreVM (store, state, hot) {
+  const oldVm = store._vm
+
+  store.getters = {}
+  store._makeLocalGettersCache = Object.create(null)
+  const wrappedGetters = store._wrappedGetters
+  const computed = {}
+  
+  forEachValue(wrappedGetters, (fn, key) => {
+    computed[key] = partial(fn, store)
+    // 将wrappedGetters的属性定义到store.getter中 ,其中get方法从 vue实例的compute中获取
+    // 保证了外部获取getter时，其实是获取vue实例的属性，通过Vue的特性实现getter的响应式数据
+    Object.defineProperty(store.getters, key, {
+      get: () => store._vm[key], // computed
+      enumerable: true // for local getters
+    })
+  })
+
+  // store.vm被定义为Vue的实例，其中computed的属性定义为 partial(fn, store) ===》  fn(store)
+  store._vm = new Vue({
+    data: {
+      $$state: state
+    },
+    computed
+  })
+  
+}
+复制代码
+```
+
+   通过上文分析可知 getter 根据对应的 namespace 的规则存储在 store._wrappedGetters 对象中，forEachValue 方法通过遍历 store._wrappedGetters 对象，复制该对象到 computed 对象中，同时设置 store.getters 的 get 方法 ，则有如下调用关系：
+
+```JavaScript
+this.$store.getter.xxx  ------>   store.vm[xxx]  （1）
+
+复制代码
+```
+
+   继续分析，通过调用 Vue 的构造函数返回对象 store._vm ， 则可知 store._vm 中的数据是响应式的。又因为 store._vm 的 computed 属性被设置为局部变量 computed 对象（ 其实就是getter的集合 ），则（1）式 实际可以理解为：获取 store 的 getter 属性，就是获取 store._vm 中对应的 computed 的属性，因为 store._vm 是响应式的对象，则 getter 中的数据也是响应式的；
+
+    又因为 store 实例中提供 state 属性的 get 方法。代码如下：
+
+```JavaScript
+  get state () {
+    return this._vm._data.$$state
+  }
+复制代码
+```
+
+   则 this.$store.state 实际返回的是 store._vm._data.state，由resetStoreVM方法可知store.vm是Vue的实例，因此store.vm.data.state，由 resetStoreVM 方法可知 store._vm 是 Vue 的实例，因此 store._vm._data.state，由resetStoreVM方法可知store.vm是Vue的实例，因此store.vm.data.state 是响应式数据，则 store.state 也实现了响应式。
+
+   至此就可以回答 **问题 4. 如何实现数据响应式？**
+
+   **通过构造 Vue 实例，将 store.state 属性设置为 data 数据，将 store.getter 集合设置为 computed 属性，并将 computed 方法 （具体的 getter ）指向 store 中对应的 getter 方法。**
+
+### 5、store的方法调用
+
+#### 5.1、 commit方法
+
+   commit 方法执行很简单，有之前的 mutation 部分可知，所有的 mutation 都被存放在 store._mutations 对象。如果能找到对应的 mutation 执行就好了，同时还需要完成 store 相关的订阅的执行。
+
+```JavaScript
+   const {
+      type,
+      payload,
+      options
+    } = unifyObjectStyle(_type, _payload, _options)
+    
+  const entry = this._mutations[type]
+  
+  // 执行mutation方法
+  entry.forEach(function commitIterator (handler) {
+    handler(payload)
+  })
+  
+  this._subscribers.slice().forEach(sub => sub(mutation, this.state))
+  
+复制代码
+```
+
+   其中 unifyObjectStyle 是为了让 mutation、action 的两种调用方式，最终在执行是呈现统一的数据结构。
+
+```
+// 方式1
+store.commit('increment', {
+  amount: 10
+})
+
+
+//方式2 
+store.commit({
+  type: 'increment',
+  amount: 10
+})
+
+复制代码
+```
+
+#### 5.2、 dispatch方法
+
+   dispatch 方法被存放在 store._action对象。同 mutation 只需要找到对应的 action 执行就行，同时完成 action 相关的订阅 _actionSubscribers （before 订阅 和  after 订阅）。 同时通过 Promise.all 保证所有 action 执行完成之后，才执行 after actionSubscribers。核心代码如下：
+
+```JavaScript
+this._actionSubscribers
+     .slice() 
+     .filter(sub => sub.before)
+     .forEach(sub => sub.before(action, this.state))
+     
+ const result = entry.length > 1
+      ? Promise.all(entry.map(handler => handler(payload)))
+      : entry[0](payload)
+      
+ return new Promise((resolve, reject) => {
+      result.then(res => {
+        try {
+         // 执行 after actionSubscribers
+        resolve(res)
+      }, error => {
+        // 执行 actionSubscribers error
+        reject(error)
+      })
+    })     
+复制代码
+```
+
+### 6、辅助方法
+
+#### 6.1 mapXXX 方法
+
+   Vuex 提供 mapState 、mapGetter 、mapMutation、 mapAction 四个辅助方法， 实现的原理基本上是一致， 以 mapAction 为例，通常有对象、数组两种引用方式 ：
+
+```JavaScript
+    // (1) 数组形式 - 无namespace 
+    ...mapActions([
+      'increment', 
+      'incrementBy'
+    ]),
+    
+    // (2) 对象形式 - 无namespace
+    ...mapActions({
+      add: 'increment'
+    })
+    
+    
+    // (3) 数组形式 - 有namespace
+    ...mapActions('moduleName/moduleName',[
+      'increment',
+      'incrementBy'
+    ]),
+    
+    //(4) 对象形式 - 无namespace
+    ....mapActions('moduleName/moduleName',{
+      add: 'increment' 
+    })
+
+复制代码
+```
+
+   有以上实例，可知 mapActions 的调用方式，共有 4 种，来看下源码：
+
+```JavaScript
+export const mapActions = normalizeNamespace((namespace, actions) => {
+  const res = {}
+  if (__DEV__ && !isValidMap(actions)) {
+    console.error('[vuex] mapActions: mapper parameter must be either an Array or an Object')
+  }
+  normalizeMap(actions).forEach(({ key, val }) => {
+    res[key] = function mappedAction (...args) {
+      // get dispatch function from store
+      let dispatch = this.$store.dispatch
+      // 如果存在namespace,则将dispatch设置为module中的dispatch，否则为root的dispatch
+      if (namespace) {
+        const module = getModuleByNamespace(this.$store, 'mapActions', namespace)
+        if (!module) {
+          return
+        }
+        dispatch = module.context.dispatch
+      }
+      // 真正调用时，通过dispatch去触发action操作。
+      return typeof val === 'function'
+        ? val.apply(this, [dispatch].concat(args))
+        : dispatch.apply(this.$store, [val].concat(args))
+    }
+  })
+复制代码
+```
+
+   其中，normalizeNamespace 是为了统一 namespace 参数，如果没有 namespace 参数，则将参数为空，实例 中的 （1）为例，通过 normalizeNamespace 处理后，返回结果为：
+
+```JavaScript
+  // (1) 数组形式 - 无namespace 
+    ...mapActions(''，[
+      'increment',
+      'incrementBy' 
+    ]),
+复制代码
+```
+
+   通过 normalizeNamespace 抹平 namespace 参数的影响之后，就剩下数组和对象两种引用方式了，如你所料, normalizeMap 是为了解决两种调用方式传入的数据格式不一致的问题，以（3），（4）为例，返回结果统一为 [{key:'',val:''}]：
+
+```JavaScript
+// (3) 数组形式 - 有namespace
+    ...mapActions('moduleName/moduleName',[
+      {key:'increment' : val:'increment' }, 
+      {key:'incrementBy' : val:'incrementBy' }, 
+    ]),
+    
+    //(4) 对象形式 - 无namespace
+    ....mapActions('moduleName/moduleName',[
+        { key:add: val:'increment'}
+    ])
+复制代码
+```
+
+   mapXXX 最终都会返回数组-对象（Array-Object），对象的 key ，即为你引用的 key （数组引用时，就是数组元素），value 为 function 。 以 dispatch 为例，最终被混合到 methods 中，真正执行调用该方法的时候，实际执行的就是：
+
+```JavaScript
+ // 真正调用时，通过dispatch去触发action操作。
+      return typeof val === 'function'
+        ? val.apply(this, [dispatch].concat(args))
+        : dispatch.apply(this.$store, [val].concat(args))  // 常用
+    }
+复制代码
+```
+
+  通过调用 dispatch 执行对应的 action，其中 type 中是 val，对应到实例（4）中就是 increment 方法，args 就是执行方法传入的参数，最终以 payload 传入action。
+
+  其中，如果存在 namespace 时，则 dispatch 为当前 context提供的方法。所以实例 （4）中最终执行的是下边的语句
+
+```JavaScript
+  context.dispatch('increment',payload)
+复制代码
+```
+
+   由之前的分析可知  context.dispatch 会添加当前的 namespace 对应的 moduleName 的链接集合， 所以上边的语句最终执行的是：
+
+```JavaScript
+  store.dispatch('moduleName/moduleName/increment',payload)
+复制代码
+```
+
+#### 6.1 createNamespacedHelpers
+
+   createNamespacedHelpers 的目的是为了通过命名空间创建辅助函数。源码如下，非常简单，其实就是通过给 mapXXX 函数传递 namespace 参数。
+
+```JavaScript
+export const createNamespacedHelpers = (namespace) => ({
+  mapState: mapState.bind(null, namespace),
+  mapGetters: mapGetters.bind(null, namespace),
+  mapMutations: mapMutations.bind(null, namespace),
+  mapActions: mapActions.bind(null, namespace)
+})
+复制代码
+```
+
+   至此就可以回答 **问题 5. 辅助类的函数式如何实现？**
+
+   **首先，统一 mapXXX 方法的调用方式 ： 有无 namespace 和对象或者数组的调用方式，然后通过对应的 namespace 获取 store 对象中对应属性元素 （state -  store.state , action  -  store._action ），并返回 key - value 的对象 （key 为引入时的对象属性或者数组元素，value 为对应的 store 中对应的方法或者属性），在使用中将这些属性注入到 Vue 的实例中。**
+
+### 7、总结
+
+   Vuex 本质上是一个 Vue 的插件，通过 Vue.use(Vuex) 引用后，在 Vue 的实例中注入（mixin）了 store(this.store)属性，这使得在Vue实例中都能通过this.store ( this.store ) 属性，这使得在 Vue 实例中都能通过 this.store(this.store)属性，这使得在Vue实例中都能通过this.store 访问到 Vuex 的实例 （store）。
+
+   Vuex.Store 是一个类 （ class ），在实例化时，会将各个 module （ root 本身也可以理解为module ： rootModule ） 下的 state 、getter、mutation、action 按照一定的 namespace 组合 （ 如果没有设置namespace，则各个namespace的组合可以理解为空 ）存放在 store 下个对应属性中，同时通过巧妙的使用 Vue 的数据响应式的特点，使得 Vuex 的 state、getter 也能实现数据响应式。提供了dispatch 方法用于调用 action，提供 commit 方法用于调用 mutation。
+
+   为方便在 Vue 中使用 Vuex，提供了一系列的辅助函数，这些辅助函数的本质，就是在 store 中找到对应属性的对象（例如，mapState 对应的就是 store.state ，mapMutation 对应的就是 store._mutation ）,在需要使用的时候，或者执行对应的方法（mapGetter、mapMutation、mapAction），或者返回对应的属性（mapState）。
+
 ## Vue3
 
 ### 1.Vue3有哪些新特性？
