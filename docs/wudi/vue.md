@@ -5652,6 +5652,45 @@ watchEffect(
 
 以上五种情况顺序执行。满足其中一种情况，后续的就不在比较，就会去下一个节点进行比较
 
+## Diff 算法核心原理——源码
+
+上面说了Diff 算法，在 Vue 里面就是 patch，铺垫了这么多，下面进入源码里看一下这个神乎其神的 patch 干了啥？
+
+### patch
+
+源码地址：`src/core/vdom/patch.js -700行`
+
+其实 patch 就是一个函数，我们先介绍一下源码里的核心流程，再来看一下 patch 的源码，源码里每一行也有注释
+
+它可以接收四个参数，主要还是前两个
+
+- **oldVnode**：老的虚拟 DOM 节点
+- **vnode**：新的虚拟 DOM 节点
+- **hydrating**：是不是要和真实 DOM 混合，服务端渲染的话会用到，这里不过多说明
+- **removeOnly**：transition-group 会用到，这里不过多说明
+
+主要流程是这样的：
+
+- vnode 不存在，oldVnode 存在，就删掉 oldVnode
+- vnode 存在，oldVnode 不存在，就创建 vnode
+- 两个都存在的话，通过 sameVnode 函数(后面有详解)对比是不是同一节点
+  - 如果是同一节点的话，通过 patchVnode 进行后续对比节点文本变化或子节点变化
+  - 如果不是同一节点，就把 vnode 挂载到 oldVnode 的父元素下
+    - 如果组件的根节点被替换，就遍历更新父节点，然后删掉旧的节点
+    - 如果是服务端渲染就用 hydrating 把 oldVnode 和真实 DOM 混合
+
+### patchVnode
+
+源码地址：`src/core/vdom/patch.js -501行`
+
+**这个是在新的 vnode 和 oldVnode 是同一节点的情况下，才会执行的函数，主要是对比节点文本变化或子节点变化**
+
+- 如果 vnode 不是文本节点也不是注释的情况下
+  - 如果 vnode 和 oldVnode 都有子节点，而且子节点不一样的话，就调用 updateChildren 更新子节点
+  - 如果只有 vnode 有子节点，就调用 addVnodes 创建子节点
+  - 如果只有 oldVnode 有子节点，就调用 removeVnodes 删除该子节点
+  - 如果 vnode 文本为 undefined，就删掉 vnode.elm 文本
+
 #### vue2双端比较
 
 所谓`双端比较`就是**新列表**和**旧列表**两个列表的头与尾互相对比，，在对比的过程中指针会逐渐向内靠拢，直到某一个列表的节点全部遍历过，对比停止。
@@ -5678,158 +5717,60 @@ function vue2Diff(prevChildren, nextChildren, parent) {
 3.  使用**旧列表**的头一个节点`oldStartNode`与**新列表**的最后一个节点`newEndNode`对比
 4.  使用**旧列表**的最后一个节点`oldEndNode`与**新列表**的头一个节点`newStartNode`对比
 
-使用以上四步进行对比，去寻找`key`相同的可复用的节点，当在某一步中找到了则停止后面的寻找。具体对比顺序如下图
-
-![img](https://s2.loli.net/2022/07/09/6U1HfgkxDyEa5Zp.webp)
-
-对比顺序代码结构如下:
-
-```js
-function vue2Diff(prevChildren, nextChildren, parent) {
-  let oldStartIndex = 0,
-    oldEndIndex = prevChildren.length - 1
-    newStartIndex = 0,
-    newEndIndex = nextChildren.length - 1;
-  let oldStartNode = prevChildren[oldStartIndex],
-    oldEndNode = prevChildren[oldEndIndex],
-    newStartNode = nextChildren[newStartIndex],
-    newEndNode = nextChildren[newEndIndex];
-  
-  if (oldStartNode.key === newStartNode.key) {
-
-  } else if (oldEndNode.key === newEndNode.key) {
-
-  } else if (oldStartNode.key === newEndNode.key) {
-
-  } else if (oldEndNode.key === newStartNode.key) {
-
-  }
-}
-```
-
-当对比时找到了可复用的节点，我们还是先`patch`给元素打补丁，然后将指针进行`前/后移`一位指针。
-
-根据对比节点的不同，我们移动的**指针**和**方向**也不同，具体规则如下：
-
-1.  当**旧列表**的头一个节点`oldStartNode`与**新列表**的头一个节点`newStartNode`对比时`key`相同。那么**旧列表**的头指针`oldStartIndex`与**新列表**的头指针`newStartIndex`同时向**后**移动一位。      **旧前比新前     后移**
-2.  当**旧列表**的最后一个节点`oldEndNode`与**新列表**的最后一个节点`newEndNode`对比时`key`相同。那么**旧列表**的尾指针`oldEndIndex`与**新列表**的尾指针`newEndIndex`同时向**前**移动一位。      **旧后比新后     前移**
-3.  当**旧列表**的头一个节点`oldStartNode`与**新列表**的最后一个节点`newEndNode`对比时`key`相同。那么**旧列表**的头指针`oldStartIndex`向**后**移动一位；**新列表**的尾指针`newEndIndex`向**前**移动一位。  **旧前比新后**       远离
-4.  当**旧列表**的最后一个节点`oldEndNode`与**新列表**的头一个节点`newStartNode`对比时`key`相同。那么**旧列表**的尾指针`oldEndIndex`向**前**移动一位；**新列表**的头指针`newStartIndex`向**后**移动一位。    **旧后比新前**    靠近
-
-在小节的开头，提到了要让指针向内靠拢，所以我们需要循环。循环停止的条件是当其中一个列表的节点全部遍历完成，代码如下
-
-```js
-function vue2Diff(prevChildren, nextChildren, parent) {
-  let oldStartIndex = 0,
-    oldEndIndex = prevChildren.length - 1,
-    newStartIndex = 0,
-    newEndIndex = nextChildren.length - 1;
-  let oldStartNode = prevChildren[oldStartIndex],
-    oldEndNode = prevChildren[oldEndIndex],
-    newStartNode = nextChildren[newStartIndex],
-    newEndNode = nextChildren[newEndIndex];
-  while (oldStartIndex <= oldEndIndex && newStartIndex <= newEndIndex) {
-    if (oldStartNode.key === newStartNode.key) {
-      patch(oldStartNode, newStartNode, parent)
-
-      oldStartIndex++
-      newStartIndex++
-      oldStartNode = prevChildren[oldStartIndex]
-      newStartNode = nextChildren[newStartIndex]
-    } else if (oldEndNode.key === newEndNode.key) {
-      patch(oldEndNode, newEndNode, parent)
-
-      oldEndIndex--
-      newndIndex--
-      oldEndNode = prevChildren[oldEndIndex]
-      newEndNode = nextChildren[newEndIndex]
-    } else if (oldStartNode.key === newEndNode.key) {
-      patch(oldvStartNode, newEndNode, parent)
-
-      oldStartIndex++
-      newEndIndex--
-      oldStartNode = prevChildren[oldStartIndex]
-      newEndNode = nextChildren[newEndIndex]
-    } else if (oldEndNode.key === newStartNode.key) {
-      patch(oldEndNode, newStartNode, parent)
-
-      oldEndIndex--
-      newStartIndex++
-      oldEndNode = prevChildren[oldEndIndex]
-      newStartNode = nextChildren[newStartIndex]
-    }
-  }
-}
-```
+使用以上四步进行对比，去寻找`key`相同的可复用的节点，当在某一步中找到了则停止后面的寻找。
 
 ##### 非理想情况
 
 有一种特殊情况，当四次对比都**没找到**复用节点时，我们只能拿**新列表**的第一个节点去**旧列表**中找与其`key`相同的节点
 
-```js
-function vue2Diff(prevChildren, nextChildren, parent) {
-  //...
-  while (oldStartIndex <= oldEndIndex && newStartIndex <= newEndIndex) {
-    if (oldStartNode.key === newStartNode.key) {
-    //...
-    } else if (oldEndNode.key === newEndNode.key) {
-    //...
-    } else if (oldStartNode.key === newEndNode.key) {
-    //...
-    } else if (oldEndNode.key === newStartNode.key) {
-    //...
-    } else {
-      // 在旧列表中找到 和新列表头节点key 相同的节点
-      let newKey = newStartNode.key,
-        oldIndex = prevChildren.findIndex(child => child.key === newKey);
-      
-    }
-  }
-}
-```
-
 找节点的时候其实会有两种情况：一种在**旧列表**中找到了，另一种情况是没找到
 
 当我们在旧列表中找到对应的`VNode`，我们只需要将找到的节点的`DOM`元素，移动到开头就可以了。这里的逻辑其实和`第四步`的逻辑是一样的，只不过`第四步`是移动的尾节点，这里是移动找到的节点。`DOM`移动后，由我们将**旧列表**中的节点改为`undefined`，这是**至关重要**的一步，因为我们已经做了节点的移动了所以我们不需要进行再次的对比了。最后我们将头指针`newStartIndex`向后移一位
 
-如果在**旧列表**中没有找到复用节点呢？很简单，直接创建一个新的节点放到最前面就可以了，然后后**移头指针`newStartIndex`**。
+如果在**旧列表**中没有找到复用节点，直接创建一个新的节点放到最前面就可以了，然后后**移头指针`newStartIndex`**。
 
 最后当**旧列表**遍历到`undefind`时就跳过当前节点。
 
-```javascript
-if (newStartVNode.key === oldStartVNode.key) {
-  // 第一步
-} else if (newEndVNode.key === oldEndVNode.key) {
-  // 第二步
-} else if (newEndVNode.key === oldStartVNode.key) {
-  // 第三步
-} else if (newStartVNode.key = oldEndVNode.key) {
-  // 第四步
-} else {
-	// 特殊情况
-  const idxInOld = oldChildren.findIndex(node => node.key === newStartVNode.key)
-  if (idxInOld > 0) {
-    const vnodeToMove = oldChildren[idxInOld]
-    patch(vnodeToMove, newStartVNode, container) // 补丁修改不同
-    insert(vnodeToMove.el, container, oldStartVNode.el) // 移动dom到旧节点第一个前面
-    oldChildren[idxInOld] = undefined // 将旧节点设置为undefined
-    newStartVNode = newChildren[++newStartIdx] // 更新索引值，指向下一个节点
-  }
-}
-
-```
-
-
-
-##### 添加节点
-
-此时`oldEndIndex`以及小于了`oldStartIndex`，但是**新列表**中还有剩余的节点，我们只需要将剩余的节点依次插入到`oldStartNode`的`DOM`之前就可以了。为什么是插入`oldStartNode`之前呢？原因是剩余的节点在**新列表**的位置是位于`oldStartNode`之前的，如果剩余节点是在`oldStartNode`之后，`oldStartNode`就会先行对比，这个需要思考一下，其实还是与`第四步`的思路一样。
-
-##### 移除节点
-
-与上一小节的情况相反，当**新列表**的`newEndIndex`小于`newStartIndex`时，我们将**旧列表**剩余的节点删除即可。这里我们需要注意，**旧列表**的`undefind`。在第二小节中我们提到过，当头尾节点都不相同时，我们会去**旧列表**中找**新列表**的第一个节点，移动完DOM节点后，将**旧列表**的那个节点改为`undefind`。所以我们在最后的删除时，需要注意这些`undefind`，遇到的话跳过当前循环即可。
-
 #### vue3 最长递增子序列
+
+### vue3的优化
+
+事件缓存：将事件缓存，可以理解为变成静态的了
+
+添加静态标记：Vue2 是全量 Diff，Vue3 是静态标记 + 非全量 Diff
+
+静态提升：创建静态节点时保存，后续直接复用
+
+使用最长递增子序列优化了对比流程：Vue2 里在 updateChildren() 函数里对比变更，在 Vue3 里这一块的逻辑主要在 patchKeyedChildren() 函数里，具体看下面
+
+
+
+在 Vue2 里 `updateChildren` 会进行
+
+- 头和头比
+- 尾和尾比
+- 头和尾比
+- 尾和头比
+- 都没有命中的对比
+
+在 Vue3 里 `patchKeyedChildren` 为
+
+- 头和头比
+- 尾和尾比
+- 基于最长递增子序列进行移动/添加/删除
+
+看个例子，比如
+
+- 老的 children：`[ a, b, c, d, e, f, g ]`
+- 新的 children：`[ a, b, f, c, d, e, h, g ]`
+
+1. 先进行头和头比，发现不同就结束循环，得到 `[ a, b ]`
+2. 再进行尾和尾比，发现不同就结束循环，得到 `[ g ]`
+3. 再保存没有比较过的节点 `[ f, c, d, e, h ]`，并通过 newIndexToOldIndexMap 拿到在数组里对应的下标，生成数组 `[ 5, 2, 3, 4, -1 ]`，`-1` 是老数组里没有的就说明是新增
+4. 然后再拿取出数组里的最长递增子序列，也就是 `[ 2, 3, 4 ]` 对应的节点 `[ c, d, e ]`
+5. 然后只需要把其他剩余的节点，基于 `[ c, d, e ]` 的位置进行移动/新增/删除就可以了
+
+
 
 其实就简单的看一眼我们就能发现，这两段文字是有一部分是相同的，**这些文字是不需要修改也不需要移动的**，真正需要进行修改中间的几个字母，所以`diff`就变成以下部分
 
@@ -6174,352 +6115,404 @@ key 是为 Vue 中 vnode 的唯一标记，通过这个 key，diff 操作可以�
 
 
 
-## vue源码分析
+# vue源码分析
 
-### 基本实现
+## Vue2 完整的生命周期
 
- [深入理解Vue完整版和runtime版](https://juejin.cn/post/6844904029877698568)
+大致可分成四个阶段
 
-[一步一步实现一个VUe](https://www.cnblogs.com/kidney/p/8018226.html)
+- 初始化阶段：为 Vue 实例初始化一些事件、属性和响应式数据等
+- 模板编译阶段：把我们写的 `<template></template>` 模板编译成渲染函数 `render`
+- 挂载阶段：把模板渲染到真实的 DOM 节点上，以及数据变更时执行更新操作
+- 销毁阶段：把组件实例从父组件中删除，并取消依赖监听和事件监听
 
-核心功能：响应式的数据绑定、虚拟 DOM、diff 算法、patch 方法（用于更新真实 DOM）
+![image.png](https://s2.loli.net/2022/07/14/MAXPybl3861jqng.webp)
 
-**当 new Vue() 的时候发生了什么？**
+### 初始化阶段
 
-我们的实现会参考源码的套路，但会大量的简化其中的细节。为了理解源码的结构，最好的突破口就是了解程序的起点 new Vue() 的背后究竟发生了什么。
+### new Vue()
 
-简单梳理下源码的执行流：
-
-=> 初始化生命周期
-
-=> 初始化事件系统
-
-=> 初始化state，依次处理 props、data、computed …
-
-=> 开始渲染 _mount() => _render() 返回 vdom=> _update() => __patch__() 更新真实DOM
-
-更详细的说明可以参考[这篇文章](https://github.com/DDFE/DDFE-blog/issues/17)，我们只会实现其中最核心的部分
-
-**第一步：将虚拟 DOM 树渲染到真实的 DOM**
-
-每一个 DOM 节点都是一个 node 对象，这个对象含有大量的属性与方法，虚拟 DOM 其实就是超轻量版的 node 对象。
-
-![img](https://images2017.cnblogs.com/blog/925891/201712/925891-20171210204107208-1422789571.png)
-
- 
-
-我们要生成的 DOM 树看上去是这样的：
-
-![img](https://images2017.cnblogs.com/blog/925891/201712/925891-20171210204251833-1151977100.png)
-
-关于 data 参数的属性，请参考[官方文档](https://cn.vuejs.org/v2/guide/render-function.html#深入-data-对象)
-
-随后我们会通过 createElm 方法和 createChildren 方法的相互调用，遍历整棵虚拟节点树，生成真实的 DOM 节点树，最后替换到挂载点。
-
-[完整代码](https://github.com/bison1994/vue-for-learning/blob/master/stage-1/vue-0.1.js)
-
- 
-
-**第二步：修改数据，执行 diff 算法，并将变化的部分 patch 到真实 DOM**
-
-![img](https://images2017.cnblogs.com/blog/925891/201712/925891-20171210224300083-1995638876.png)
-
-diff 算法的逻辑比较复杂，可以单独摘出来研究，由于我们的目的是理解框架的核心逻辑，因此代码实现里只考虑了最简单的情形。
-
-[完整代码](https://github.com/bison1994/vue-for-learning/blob/master/stage-3/vue-0.3.js)
-
- 
-
-**第三步：对数据做响应式处理，当数据变化时，自动执行更新方法**
-
-![img](https://images2017.cnblogs.com/blog/925891/201712/925891-20171210224314927-1241933347.jpg)
-
-data 中的每一个属性都会被处理为存取器属性，同时每一个属性都会在闭包中维护一个属于自己的 dep 对象，用于存放该属性的依赖项。当属性被赋予新的值时，就会触发 set 方法，并通知所有依赖项进行更新。
-
-[完整代码](https://github.com/bison1994/vue-for-learning/blob/master/stage-4/vue-0.4.js)
-
-### 初始化、更新流程分析
-
-[vue更新流程](https://segmentfault.com/a/1190000041560503)
+这个阶段做的第一件事，就是用 new 创建一个 Vue 实例对象
 
 ```js
-<div id="demo">
-    <child :list="list"></child>
-    <button @click="handleAdd">add</button>
-</div>
-<script>
-    Vue.component('child', {
-        props: {
-            list: {
-                type: Array,
-                default: () => []
-            }
-        },
-        template: '<p>{{ list }}</p>'
-    })
-
-    new Vue({
-        el: "#demo",
-        data() {
-          return {
-              list: [1,2]
-          }
-        },
-        methods: {
-            handleAdd() {
-                this.list.push(Math.random())
-            }
-        }
-    })
-</script>
+new Vue({
+    el:'#app',
+    store,
+    router,
+    render: h => h(App)
+})
+复制代码
 ```
 
-很简单的例子，一个父组件一个子组件，子组件接受一个list，父组件有个按钮，可以往list里push数据改变list
+能用 new 那肯定是有一个构造函数的，我们来看一下
 
-#### 初始化流程：
+源码地址：`src/core/instance/index.js - 8行`
 
-1.  首先从 `new Vue({el: "#app"})` 开始，会执行 `_init` 方法。
+```js
+function Vue (options) {
+  if (process.env.NODE_ENV !== 'production' && !(this instanceof Vue) ) {
+    warn('Vue is a constructor and should be called with the `new` keyword')
+  }
+  this._init(options)
+}
+initMixin(Vue)
+复制代码
+```
 
-    ```javascript
-    function Vue (options) {
-       // 省略...
-       this._init(options)
+可以看出 new Vue() 的关键就是 `_init()` 了，来看一下它是哪来的，干了些什么
+
+### _init()
+
+源码地址：`src/core/instance/init.js - 15行`
+
+我这里去掉了一些环境判断的，主要流程就是
+
+- 合并配置，主要是把一些内置组件`<component/>`、`<keep-alive>`、`<transition>`、`directive`、`filter`、本文最开始的钩子函数名称列表等合并到 Vue.options上面
+- 调用一些初始化函数，这里具体初始化了哪些东西我写在注释里了
+- 触发生命周期钩子，`beforeCreate` 和 `created`
+- 最后调用 `$mount` 挂载 进入下一阶段
+
+```js
+export function initMixin (Vue: Class<Component>) {
+  // 在原型上添加 _init 方法
+  Vue.prototype._init = function (options?: Object) {
+    // 保存当前实例
+    const vm: Component = this
+    // 合并配置
+    if (options && options._isComponent) {
+      // 把子组件依赖父组件的 props、listeners 挂载到 options 上，并指定组件的$options
+      initInternalComponent(vm, options)
+    } else {
+      // 把我们传进来的 options 和当前构造函数和父级的 options 进行合并，并挂载到原型上
+      vm.$options = mergeOptions(
+        resolveConstructorOptions(vm.constructor),
+        options || {},
+        vm
+      )
     }
-    ```
+    vm._self = vm
+    initLifecycle(vm) // 初始化实例的属性、数据：$parent, $children, $refs, $root, _watcher...等
+    initEvents(vm) // 初始化事件：$on, $off, $emit, $once
+    initRender(vm) // 初始化渲染： render, mixin
+    callHook(vm, 'beforeCreate') // 调用生命周期钩子函数
+    initInjections(vm) // 初始化 inject
+    initState(vm) // 初始化组件数据：props, data, methods, watch, computed
+    initProvide(vm) // 初始化 provide
+    callHook(vm, 'created') // 调用生命周期钩子函数
 
-2.  `_init` 方法的最后执行了 `vm.$mount` 挂载实例。
-
-    ```javascript
-    Vue.prototype._init = function (options) {
-       var vm = this;
-       // 省略...
-       if (vm.$options.el) {
-           vm.$mount(vm.$options.el);
-       }
+    if (vm.$options.el) {
+      // 如果传了 el 就会调用 $mount 进入模板编译和挂载阶段
+      // 如果没有传就需要手动执行 $mount 才会进入下一阶段
+      vm.$mount(vm.$options.el)
     }
-    ```
+  }
+}
+复制代码
+```
 
-3.  如果此时运行的版本是 `runtime with compiler` 版本，这个版本的 `$mount` 会被进行重写，增加了把template模板转成render渲染函数的操作，但最终都会走到 `mountComponent` 方法。
+这里需要记着上面流程说明，合并了哪些配置，初始化了什么东西，分别在什么时候调用了两个生命周期钩子函数，最后调用 `$mount` 挂载，进入下一阶段
 
-    ```javascript
-    Vue.prototype.$mount = function (el, hydrating) {
-         el = el && inBrowser ? query(el) : undefined;
-         return mountComponent(this,el,hydrating);
-    };
-    
-    var mount = Vue.prototype.$mount; //缓存上一次的Vue.prototype.$mount
-    
-    Vue.prototype.$mount = function (el, hydrating) { //重写Vue.prototype.$mount
-         // 省略，将template转化为render渲染函数
-         return mount.call(
-           this,
-           el,
-           hydrating
-         )
-    };
-    ```
+### $mount()
 
-4.  `mountComponent` 里触发了 `beforeMount` 和 `mounted` 生命周期，更重要的是创建了 `Watcher`，传入的 `updateComponent` 就是Watcher的 `getter`。
+源码地址：`dist/vue.js - 11927行`
 
-    ```javascript
-    function mountComponent(vm, el, hydrating) {
-         // 执行生命周期函数 beforeMount
-         callHook(vm, 'beforeMount');
-    
-         var updateComponent;
-         //如果开发环境
-         if ("development" !== 'production' && config.performance && mark) {
-                // 省略...
-         } else {
-             updateComponent = function () {
-                 vm._update(
-                     vm._render(), // 先执行_render,返回vnode
-                     hydrating
-                 );
-             };
-         }
-    
-         new Watcher(
-             vm,
-             updateComponent,
-             noop,
-             null,
-             true // 是否渲染过得观察者
-         );
-        
-         if (vm.$vnode == null) {
-             vm._isMounted = true;
-             // 执行生命周期函数mounted
-             callHook(vm, 'mounted');
-         }
-         return vm
-     }
-    ```
-
-5.  在创建 `Watcher` 时会触发 `get()` 方法，`pushTarget(this)` 将 `Dep.target` 设置为当前 Watcher 实例。
-
-    ```javascript
-    function Watcher(vm, expOrFn, cb, options, isRenderWatcher) {
-       if (typeof expOrFn === 'function') {
-           this.getter = expOrFn;
-       }
-       this.value = this.lazy ?  // 这个有是组件才为真
-           undefined :
-           this.get(); //计算getter，并重新收集依赖项。 获取值
-    };
-    
-     Watcher.prototype.get = function get() {
-         pushTarget(this);
-         var value;
-         var vm = this.vm;
-         try {
-             value = this.getter.call(vm, vm);
-         } catch (e) {
-    
-         } finally {
-             popTarget();
-         }
-         return value
-     };
-    ```
-
-6.  `Watcher` 的 `get()` 里会去读取数据，触发 `initData` 时使用 `Object.defineProperty` 为数据设置的 `get`，在这里进行依赖收集。我们知道Vue中每个响应式属性都有一个 `__ob__` 属性，存放的是一个Observe实例，这里的 `childOb` 就是这个 `__ob__`，通过 `childOb.dep.depend()` 往这个属性的`__ob__`中的dep里收集依赖，如下图。
-    ![WX20220315-161349@2x.png](https://segmentfault.com/img/bVcYvAZ)
-
-    ```javascript
-    export function defineReactive (
-      obj: Object,
-      key: string,
-      val: any,
-      customSetter?: Function
-    ) {
-      /*在闭包中定义一个dep对象*/
-      const dep = new Dep()
-    
-      let childOb = observe(val)
-      Object.defineProperty(obj, key, {
-       enumerable: true,
-       configurable: true,
-       get: function reactiveGetter () {
-         /*如果原本对象拥有getter方法则执行*/
-         const value = getter ? getter.call(obj) : val
-         if (Dep.target) {
-           /*进行依赖收集*/
-           dep.depend()
-           if (childOb) {
-             childOb.dep.depend()
-           }
-           if (Array.isArray(value)) {
-             dependArray(value)
-           }
-         }
-         return value
-       },
-       set: function reactiveSetter (newVal) {
-       }
-      })
-    }
-    ```
-
-7.  在我们的例子中，这个list会收集两次依赖，所以它 `__ob__` 的subs里会有 `两个Watcher`，第一次是在父组件 `data` 中的 list，第二次是在创建组件时调用 `createComponent` ，然后又会走到 `_init` => `initState` => `initProps` ，在 `initProps` 内对 `props` 传入的属性进行依赖收集。有两个Watcher就说明list改变时要通知两个地方，这很好理解。
-    .
-
-8.  最后，触发 `getter`，上面说过 `getter` 就是 `updateComponent`，里面执行 `_update` 更新视图。
-
-#### 下面来说说更新的流程：
-
-1.  点击按钮往数组中添加一个数字，在Vue中，为了监听数组变化，对数组的常用方法做了重写，所以先会走到 `ob.dep.notify()` 这里，`ob` 就是 list 的 `__ob__` 属性，上面保存着Observe实例，里面的dep中有两个 `Watcher`，调用 `notify` 去通知所有Watcher对象更新视图。
-
-    ```javascript
-    [
-      'push',
-      'pop',
-      'shift',
-      'unshift',
-      'splice',
-      'sort',
-      'reverse'
-    ]
-    .forEach(function (method) {
-     const original = arrayProto[method]
-     def(arrayMethods, method, function mutator () {
-       let i = arguments.length
-       const args = new Array(i)
-       while (i--) {
-         args[i] = arguments[i]
-       }
-       /*调用原生的数组方法*/
-       const result = original.apply(this, args)
-    
-       const ob = this.__ob__
-       let inserted
-       switch (method) {
-         case 'push':
-           inserted = args
-           break
-         case 'unshift':
-           inserted = args
-           break
-         case 'splice':
-           inserted = args.slice(2)
-           break
-       }
-       if (inserted) ob.observeArray(inserted)
-    
-       /*dep通知所有注册的观察者进行响应式处理*/
-       ob.dep.notify()
-       return result
-     })
-    })
-    ```
-
-2.  `notify` 方法里去通知所有 `Watcher` 更新，执行 `Watcher` 的 `update` 方法，`update` 里的 `queueWatcher` 过滤了一些重复的 `Watcher`, 但最终会走到 `Watcher` 的 `run()` 方法。
-
-    ```javascript
-    Dep.prototype.notify = function notify() {
-       var subs = this.subs.slice();
-       for (var i = 0, l = subs.length; i < l; i++) {
-           subs[i].update();
-       }
-    };
-    
-    Watcher.prototype.update = function update() {
-     if (this.lazy) {
-         this.dirty = true;
-    
-     } else if (this.sync) {
-         this.run();
-     } else {
-         queueWatcher(this);
-     }
-    };
-    ```
-
-3.  `run` 方法里会调用 `get()`, `get` 方法里回去触发Watcher的 `getter`，上面说过，`getter` 就是 `updateComponent`。
-
-    ```javascript
-    Watcher.prototype.run = function run() {
-      if (this.active) {
-     /* get操作在获取value本身也会执行getter从而调用update更新视图 */
-     const value = this.get()
+```js
+  Vue.prototype.$mount = function ( el, hydrating ) {
+    el = el && query(el);
+    var options = this.$options;
+    // 如果没有 render 
+    if (!options.render) {
+      var template = options.template;
+      // 再判断，如果有 template
+      if (template) {
+        if (typeof template === 'string') {
+          if (template.charAt(0) === '#') {
+            template = idToTemplate(template);
+          }
+        } else if (template.nodeType) {
+          template = template.innerHTML;
+        } else {
+          return this
+        }
+      // 再判断，如果有 el
+      } else if (el) {
+        template = getOuterHTML(el);
       }
     }
-    
-    updateComponent = function () {
-      vm._update(
-          vm._render(),
-          hydrating
-      );
-     };
-    ```
+    return mount.call(this, el, hydrating)
+  };
+复制代码
+```
 
-4.  最后在 `_update` 方法中，进行 `patch` 操作
+说白了 `$mount` 主要就是判断要不要编译，使用哪一个模板编译，需要注意的就是判断顺序了，我们来看一下这段代码
 
-### 如何设计vue的生命周期
+优先判断 `render` 是否存在，如果存在，就直接使用 render 函数了
+
+如果没有，再判断 template 和 el，如果有 `template`，就不会管 `el` 了
+
+所以优先级顺序是：`render > template > el`
+
+因为不管是 `el` 挂载的，还是 `template` 最后都会被编译成 `render` 函数，而如果已经有了 `render` 函数了，就跳过前面的编译了
+
+### 挂载阶段
+
+这里阶段主要做的事有两件
+
+1. 根据 render 返回的虚拟 DOM 创建真实的 DOM 节点，插入到视图中，完成渲染
+2. 对模板中数据或状态做响应式处理
+
+这里用了一个函数叫mountComponent()
+
+主要做的事就是
+
+- 调用钩子函数 `beforeMount`
+- 调用 `_update()` 方法对新老虚拟 DOM 进行 `patch` 以及 `new Watcher` 对模板数据做响应式处理
+- 再调用钩子函数 `mounted`
+
+```
+export function mountComponent (
+  vm: Component,
+  el: ?Element,
+  hydrating?: boolean
+): Component {
+  vm.$el = el
+  // 判断有没有渲染函数 render
+  if (!vm.$options.render) {
+    // 如果没有，默认就创建一个注释节点
+    vm.$options.render = createEmptyVNode
+  }
+  // 调用生命周期钩子函数
+  callHook(vm, 'beforeMount')
+  let updateComponent
+  updateComponent = () => {
+    // 调用 _update 对 render 返回的虚拟 DOM 进行 patch（也就是 Diff )到真实DOM，这里是首次渲染
+    vm._update(vm._render(), hydrating)
+  }
+  // 为当前组件实例设置观察者，监控 updateComponent 函数得到的数据，下面有介绍
+  new Watcher(vm, updateComponent, noop, {
+    // 当触发更新的时候，会在更新之前调用
+    before () {
+      // 判断 DOM 是否是挂载状态，就是说首次渲染和卸载的时候不会执行
+      if (vm._isMounted && !vm._isDestroyed) {
+        // 调用生命周期钩子函数
+        callHook(vm, 'beforeUpdate')
+      }
+    }
+  }, true /* isRenderWatcher */)
+  hydrating = false
+  // 没有老的 vnode，说明是首次渲染
+  if (vm.$vnode == null) {
+    vm._isMounted = true
+    // 调用生命周期钩子函数
+    callHook(vm, 'mounted')
+  }
+  return vm
+}
+```
+
+### Watcher
+
+这个阶段就是关于响应式原理的阶段
+
+再下来就是更新的阶段
+
+### _update()
+
+关于diff算法和虚拟dom的流程
+
+```js
+Vue.prototype._update = function (vnode: VNode, hydrating?: boolean) {
+    const vm: Component = this
+    const prevEl = vm.$el // 当前组件根节点
+    const prevVnode = vm._vnode // 老的 vnode
+    vm._vnode = vnode // 更新老的 vnode
+    // 如果是首次渲染
+    if (!prevVnode) {
+      // 对 vnode 进行 patch 创建真实的 DOM，挂载到 vm.$el 上
+      vm.$el = vm.__patch__(vm.$el, vnode, hydrating, false /* removeOnly */)
+    } else {
+      // 修改的时候，进行新老 vnode 对比，并回修改后的真实 DOM
+      vm.$el = vm.__patch__(prevVnode, vnode)
+    }
+    // 删除老根节点的引用
+    if (prevEl) prevEl.__vue__ = null
+    // 更新当前根节点的引用
+    if (vm.$el) vm.$el.__vue__ = vm
+    // 更新父级的引用
+    if (vm.$vnode && vm.$parent && vm.$vnode === vm.$parent._vnode) {
+      vm.$parent.$el = vm.$el
+    }
+  }
+```
+
+### $destroy()
+
+这个阶段比较简单，源码不多，主要就是：
+
+- 调用生命周期钩子函数 `beforeDestory`
+- 从父组件中删除当前组件
+- 移除当前组件内的所有观察者(依赖追踪)，删除数据对象的引用，删除虚拟 DOM
+- 调用生命周期钩子函数 `destoryed`
+- 关闭所有事件监听，删除当前根组件的引用，删除父级的引用
+
+### 什么时候会调用 $destroy()
+
+我在 patch 源码里看到有三次调用，源码地址：`src/core/vdom/patch.js`
+
+- 新的 vnode 不存在，老的 vnode 存在的时候，就触发卸载老 vnode 对应组件的 destroy。702行
+- 如果新的 vnode 根节点被修改的时候，调用老 vnode 对应组件的 destroy。767行
+- 新老 vnode 对比结束后，调用老 vnode 对应组件的 destroy。795行
+
+至此，一轮完整的 Vue 生命周期就走完了
+
+## 响应式原理
+
+Vue.js 是采用**数据劫持**结合**发布者-订阅者模式**的方式，通过Object.defineProperty()来劫持各个属性的setter，getter，在数据变动时发布消息给订阅者，触发相应的监听回调。主要分为以下几个步骤：
+
+1. 需要observe的数据对象进行递归遍历，包括子属性对象的属性，都加上setter和getter这样的话，给这个对象的某个值赋值，就会触发setter，那么就能监听到了数据变化
+2. compile解析模板指令，将模板中的变量替换成数据，然后初始化渲染页面视图，并将每个指令对应的节点绑定更新函数，添加监听数据的订阅者，一旦数据有变动，收到通知，更新视图
+3. Watcher订阅者是Observer和Compile之间通信的桥梁，主要做的事情是: ①在自身实例化时往属性订阅器(dep)里面添加自己 ②自身必须有一个update()方法 ③待属性变动dep.notify()通知时，能调用自身的update()方法，并触发Compile中绑定的回调，则功成身退。
+4. MVVM作为数据绑定的入口，整合Observer、Compile和Watcher三者，通过Observer来监听自己的model数据变化，通过Compile来解析编译模板指令，最终利用Watcher搭起Observer和Compile之间的通信桥梁，达到数据变化 -> 视图更新；视图交互变化(input) -> 数据model变更的双向绑定效果。
+
+![响应式原理流程.png](https://s2.loli.net/2022/07/14/ST2GmM76COwVEtU.webp)
+
+依赖收集的核心是 Dep，而且它与 Watcher 也是密不可分的，我们来看一下
+
+### Dep
+
+源码地址：`src/core/observer/dep.js`
+
+这是一个类，它实际上就是对 Watcher 的一种管理
+
+这里首先初始化一个 subs 数组，用来存放依赖，也就是观察者，谁依赖这个数据，谁就在这个数组里，然后定义几个方法来对依赖添加、删除、通知更新等
+
+另外它有一个静态属性 target，这是一个全局的 Watcher，也表示同一时间只能存在一个全局的 Watcher
+
+### Watcher
+
+源码地址：`src/core/observer/watcher.js`
+
+Watcher 也是一个类，也叫观察者(订阅者)，这里干的活还挺复杂的，而且还串连了渲染和编译
+
+我们自己组件里写的 watch，为什么自动就能拿到新值和老值两个参数？ 就是在 watcher.run() 里面会执行回调，并且把新值和老值传过去
+
+为什么要初始化两个 Dep 实例数组 因为 Vue 是数据驱动的，每次数据变化都会重新 render，也就是说 vm.render() 方法就又会重新执行，再次触发 getter，所以用两个数组表示，新添加的 Dep 实例数组 newDeps 和上一次添加的实例数组 deps
+
+依赖收集：
+
+- 挂载之前会实例化一个渲染 `watcher` ，进入 `watcher` 构造函数里就会执行 `this.get()` 方法
+- 然后就会执行 `pushTarget(this)`，就是把 `Dep.target` 赋值为当前渲染 `watcher` 并压入栈(为了恢复用)
+- 然后执行 `this.getter.call(vm, vm)`，也就是上面的 updateComponent() 函数，里面就执行了 `vm._update(vm._render(), hydrating)`
+- 接着执行 `vm._render()` 就会生成渲染 `vnode`，这个过程中会访问 vm 上的数据，就触发了数据对象的 getter
+- 每一个对象值的 getter 都有一个 `dep`，在触发 getter 的时候就会调用 `dep.depend()` 方法，也就会执行 `Dep.target.addDep(this)`
+- 然后这里会做一些判断，以确保同一数据不会被多次添加，接着把符合条件的数据 push 到 subs 里，到这就已经**完成了依赖的收集**，不过到这里还没执行完，如果是对象还会递归对象触发所有子项的getter，还要恢复 Dep.target 状态
 
 
 
-## 框架对比
+## 模板编译原理
+
+### 认识模板编译
+
+我们知道 `<template></template>` 这个是模板，不是真实的 HTML，浏览器是不认识模板的，所以我们需要把它编译成浏览器认识的原生的 HTML
+
+这一块的主要流程就是
+
+1. 提取出模板中的原生 HTML 和非原生 HTML，比如绑定的属性、事件、指令等等
+2. 经过一些处理生成 render 函数
+3. render 函数再将模板内容生成对应的 vnode
+4. 再经过 patch 过程( Diff )得到要渲染到视图中的 vnode
+5. 最后根据 vnode 创建真实的 DOM 节点，也就是原生 HTML 插入到视图中，完成渲染
+
+### 会有一个入口函数 baseCompile()
+
+这就是模板编译的入口函数，它接收两个参数
+
+- `template`：就是要转换的模板字符串
+- `options`：就是转换时需要的参数
+
+编译的流程，主要有三步：
+
+1. 模板解析：通过正则等方式提取出 `<template></template>` 模板里的标签元素、属性、变量等信息，并解析成抽象语法树 `AST`
+2. 优化：遍历 `AST` 找出其中的静态节点和静态根节点，并添加标记
+3. 代码生成：根据 `AST` 生成渲染函数 `render
+
+### AST抽象语法树的生成过程
+
+比如一个div标签里面包一个h1标签，然后里面在包一段文本
+
+主要就是一个栈的调用嘛，从div的开始标签会触发一个钩子函数start，触发之后就会构建一个div节点，此时发现这个栈里面是空的，说明这个div节点是根节点，因为它没有父节点。最后将这个节点推入栈中，然后将div节点的标签从模板里面截取掉嘛，
+
+然后是h1的开始标签，也会触发start函数，然后构建一个h1的节点，这时会发现栈的最里面有一个节点是div节点，就说明div节点是h1的父节点，于是将h1添加到div节点中，然后将h1节点推入栈中，将模板里面的h1的开始标签截掉，
+
+然后是一段文本嘛，会触发一个钩子函数叫chars，触发之后就会构建一个文本节点，发现栈里面的最后一个节点是h1，说明文本节点的父节点是h1，于是将文本节点添加到h1节点的子节点里面，因为文本节点没有子节点，所以文本节点不会被推入到栈中。
+
+然后是h1的结束标签，触发函数end，把栈里面的最后一个节点弹出来，
+
+然后是div的结束标签，也触发end函数，把栈里面的最后一个节点弹出来。
+
+![image-20220714175650133](https://s2.loli.net/2022/07/14/3Ox4My978oKGfN2.png)
+
+![image-20220714175705352](https://s2.loli.net/2022/07/14/7EFgWhH8ucJrGXo.png)
+
+### 然后还会有一个这个解析器
+
+### parse()
+
+源码地址：`src/complier/parser/index.js - 79行`
+
+就是这个方法就是解析器的主函数，就是它通过正则等方法提取出 `<template></template>` 模板字符串里所有的 `tag`、`props`、`children` 信息，生成一个对应结构的 ast 对象
+
+`parse` 接收两个参数
+
+- `template` ：就是要转换的模板字符串
+- `options`：就是转换时需要的参数。它包含有四个钩子函数，就是用来把 `parseHTML` 解析出来的字符串提取出来，并生成对应的 `AST`
+
+核心步骤是这样的：
+
+调用 `parseHTML` 函数对模板字符串进行解析
+
+- 解析到开始标签、结束标签、文本、注释分别进行不同的处理
+- 解析过程中遇到文本信息就调用文本解析器 `parseText` 函数进行文本解析
+- 解析过程中遇到包含过滤器，就调用过滤器解析器 `parseFilters` 函数进行解析
+
+
+
+### 然后会有一个这个优化器
+
+### 2. optimize()
+
+这个函数就是在 `AST` 里找出静态节点和静态根节点，并添加标记，为了后面 `patch` 过程中就会跳过静态节点的对比，直接克隆一份过去，从而优化了 `patch` 的性能
+
+函数里面调用的外部函数就不贴代码了，大致过程是这样的
+
+- **标记静态节点(markStatic)**。就是判断 type，上面介绍了值为 1、2、3的三种类型
+  - type 值为1：就是包含子元素的节点，设置 static 为 false 并递归标记子节点，直到标记完所有子节点
+  - type 值为 2：设置 static 为 false
+  - type 值为 3：就是不包含子节点和动态属性的纯文本节点，把它的 static = true，patch 的时候就会跳过这个，直接克隆一份去
+- **标记静态根节点(markStaticRoots)**，这里的原理和标记静态节点基本相同，只是需要满足下面条件的节点才能算作是静态根节点
+  - 节点本身必须是静态节点
+  - 必须有子节点
+  - 子节点不能只有一个文本节点
+
+源码地址：`src/complier/optimizer.js - 21行`
+
+### 然后还有一个这个文本解析器
+
+之前那个解析器解析到文本的时候会触发这个chars函数嘛，然后得到文本，而如果有个文本不是纯文本，而是带有变量的话就需要文本解析器进行二次的这个解析，
+
+先用正则表达式匹配出文本里面的变量，然后把变量坐标的文本添加到数组里面，变量的话就改成_s(x)的形式放到数组里面
+
+然后用+号将数组元素连起来变成字符串
+
+![image-20220714183617991](https://s2.loli.net/2022/07/14/dK9PA23p7W6IYn5.png)
+
+然后这个字符串会放在一个with函数里面执行，这个 `with` 在 《**你不知道的JavaScript**》上卷里介绍的是，用来欺骗词法作用域的关键字，它可以让我们更快的引用一个对象上的多个属性
+
+然后with有_c 是创建元素节点的函数， _v是创建文本节点的函数，里面又能分辨是动态还是静态的文本，还有个 _e是注释节点。
+
+#### 做个总结的话
+
+就是先通过模板得到AST抽象语法树，然后借助解析器通过解析器触发不同的钩子函数构建出不同的节点，得到一个带层次关系的AST（模板解析器的原理就是一段一段的截取模板字符串，每截取一小段字符串就会根据截取出来的字符串类型触发不同的钩子函数）解析到文本的时候会有文本解析器进行二次加工。
 
 ## Vue3 与 Vue2 区别详述
 
@@ -7043,9 +7036,60 @@ onMounted(() => {
 </script>
 ```
 
-### react和vue
+## react和vue
 
+**相似之处：**
 
+-   都将注意力集中保持在核心库，而将其他功能如路由和全局状态管理交给相关的库
+-   都有自己的构建工具，能让你得到一个根据最佳实践设置的项目模板。
+-   都使用了Virtual DOM（虚拟DOM）提高重绘性能
+-   都有props的概念，允许组件间的数据传递
+-   都鼓励组件化应用，将应用分拆成一个个功能明确的模块，提高复用性
+
+**不同之处：**
+
+**1）数据流**
+
+Vue默认支持数据双向绑定，而React一直提倡单向数据流
+
+**2）虚拟DOM**
+
+Vue2.x开始引入"Virtual DOM"，消除了和React在这方面的差异，但是在具体的细节还是有各自的特点。
+
+-   Vue宣称可以更快地计算出Virtual DOM的差异，这是由于它在渲染过程中，会跟踪每一个组件的依赖关系，不需要重新渲染整个组件树。
+-   对于React而言，每当应用的状态被改变时，全部子组件都会重新渲染。当然，这可以通过 PureComponent/shouldComponentUpdate这个生命周期方法来进行控制，但Vue将此视为默认的优化。
+
+**3）组件化**
+
+React与Vue最大的不同是模板的编写。
+
+-   Vue鼓励写近似常规HTML的模板。写起来很接近标准 HTML元素，只是多了一些属性。
+-   React推荐你所有的模板通用JavaScript的语法扩展——JSX书写。
+
+具体来讲：React中render函数是支持闭包特性的，所以我们import的组件在render中可以直接调用。但是在Vue中，由于模板中使用的数据都必须挂在 this 上进行一次中转，所以 import 完组件之后，还需要在 components 中再声明下。
+
+**4）监听数据变化的实现原理不同**
+
+-   Vue 通过 getter/setter 以及一些函数的劫持，能精确知道数据变化，不需要特别的优化就能达到很好的性能
+-   React 默认是通过比较引用的方式进行的，如果不优化（PureComponent/shouldComponentUpdate）可能导致大量不必要的vDOM的重新渲染。这是因为 Vue 使用的是可变数据，而React更强调数据的不可变。
+
+**5）高阶组件**
+
+react可以通过高阶组件（Higher Order Components-- HOC）来扩展，而vue需要通过mixins来扩展。
+
+原因高阶组件就是高阶函数，而React的组件本身就是纯粹的函数，所以高阶函数对React来说易如反掌。相反Vue.js使用HTML模板创建视图组件，这时模板无法有效的编译，因此Vue不采用HOC来实现。
+
+**6）构建工具**
+
+两者都有自己的构建工具
+
+-   React ==> Create React APP
+-   Vue ==> vue-cli
+
+**7）跨平台**
+
+-   React ==> React Native
+-   Vue ==> Weex
 
 ## Demo实现
 
