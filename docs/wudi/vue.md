@@ -20,6 +20,22 @@ Model和View并无直接关联，而是通过ViewModel来进行联系的，Model
 
 这种模式实现了 Model和View的数据自动同步，因此开发者只需要专注于数据的维护操作即可，而不需要自己操作DOM。 ![image.png](https://s2.loli.net/2022/07/09/wnbENSThUrFKjol.webp)
 
+### 42. **MVVM**的优缺点?
+
+优点:
+
+- 分离视图（View）和模型（Model），降低代码耦合，提⾼视图或者逻辑的重⽤性: ⽐如视图（View）可以独⽴于Model变化和修改，⼀个ViewModel可以绑定不同的"View"上，当View变化的时候Model不可以不变，当Model变化的时候View也可以不变。你可以把⼀些视图逻辑放在⼀个ViewModel⾥⾯，让很多view重⽤这段视图逻辑
+- 提⾼可测试性: ViewModel的存在可以帮助开发者更好地编写测试代码
+- ⾃动更新dom: 利⽤双向绑定,数据更新后视图⾃动更新,让开发者从繁琐的⼿动dom中解放
+
+缺点:
+
+- Bug很难被调试: 因为使⽤双向绑定的模式，当你看到界⾯异常了，有可能是你View的代码有Bug，也可能是Model的代码有问题。数据绑定使得⼀个位置的Bug被快速传递到别的位置，要定位原始出问题的地⽅就变得不那么容易了。另外，数据绑定的声明是指令式地写在View的模版当中的，这些内容是没办法去打断点debug的
+- ⼀个⼤的模块中model也会很⼤，虽然使⽤⽅便了也很容易保证了数据的⼀致性，当时⻓期持有，不释放内存就造成了花费更多的内存
+- 对于⼤型的图形应⽤程序，视图状态较多，ViewModel的构建和维护的成本都会⽐较⾼。
+
+
+
 ### 2.数据代理和劫持是怎么实现的？
 
 当一个Vue实例创建时，Vue会遍历data中的属性，用 Object.defineProperty（vue3.0使用proxy ）将它们转为 getter/setter，并且在内部追踪相关依赖，在属性被访问和修改时通知变化。 每个组件实例都有相应的 watcher 程序实例，它会在组件渲染的过程中把属性记录为依赖，之后当依赖项的setter被调用时，会通知watcher重新计算，从而致使它关联的组件得以更新。 ![0_tB3MJCzh_cB6i3mS-1.png](https://s2.loli.net/2022/07/09/Rc5GoW4MeblKy6i.webp)
@@ -1242,6 +1258,10 @@ JavaScript中的对象是引用类型的数据，当多个实例引用同一个�
 
 
 
+## SPA的原理
+
+js会感知到url的变化，通过这一点可以用js监听url中hash值的变化,通过onhashchange事件,由于哈希值的变换并不会引发页面的刷新和跳转,当监听到hash变化,就可以动态的切换组件,就可以实现无刷新切换页面技术
+
 ### 9.单页面Web应用的优缺点
 
 单页面应用程序将所有的活动局限于一个Web页面中，在该Web页面初始化时加载相应的HTML、JavaScript 和 CSS。一旦页面加载完成，单页面应用不会因为用户的操作而进行页面的重新加载或跳转。取而代之的是利用 JavaScript 动态的变换HTML的内容，从而实现UI与用户的交互。由于避免了页面的重新加载，单页面应用可以提供较为流畅的用户体验。
@@ -1924,6 +1944,69 @@ v-cloak 指令设置样式，样式会在 Vue 实例编译结束时，从 HTML �
 
 如果同一个watcher被多次触发，只会被推入到队列中一次。这种在缓冲时去除重复数据对于避免不必要的计算和 DOM 操作是非常重要的。然后，在下一个的事件循环tick中，Vue 刷新队列并执行实际（已去重的）工作。
 
+### 25. 描述下Vue自定义指令
+
+在 Vue2.0 中，代码复用和抽象的主要形式是组件。然而，有的情况下，你仍然需要对普通 DOM 元素进行底层操作，这时候就会用到自定义指令。 一般需要对DOM元素进行底层操作时使用，尽量只用来操作 DOM展示，不修改内部的值。当使用自定义指令直接修改 value 值时绑定v-model的值也不会同步更新；如必须修改可以在自定义指令中使用keydown事件，在vue组件中使用 change事件，回调中修改vue数据;
+
+**（1）自定义指令基本内容**
+
+- 全局定义：`Vue.directive("focus",{})`
+
+- 局部定义：`directives:{focus:{}}`
+
+- 钩子函数：指令定义对象提供钩子函数
+
+  o bind：只调用一次，指令第一次绑定到元素时调用。在这里可以进行一次性的初始化设置。
+
+  o inSerted：被绑定元素插入父节点时调用（仅保证父节点存在，但不一定已被插入文档中）。
+
+  o update：所在组件的VNode更新时调用，但是可能发生在其子VNode更新之前调用。指令的值可能发生了改变，也可能没有。但是可以通过比较更新前后的值来忽略不必要的模板更新。
+
+  o ComponentUpdate：指令所在组件的 VNode及其子VNode全部更新后调用。
+
+  o unbind：只调用一次，指令与元素解绑时调用。
+
+- 钩子函数参数 o el：绑定元素
+
+  o bing： 指令核心对象，描述指令全部信息属性
+
+  o name
+
+  o value
+
+  o oldValue
+
+  o expression
+
+  o arg
+
+  o modifers
+
+  o vnode  虚拟节点
+
+  o oldVnode：上一个虚拟节点（更新钩子函数中才有用）
+
+**（2）使用场景**
+
+- 普通DOM元素进行底层操作的时候，可以使用自定义指令
+- 自定义指令是用来操作DOM的。尽管Vue推崇数据驱动视图的理念，但并非所有情况都适合数据驱动。自定义指令就是一种有效的补充和扩展，不仅可用于定义任何的DOM操作，并且是可复用的。
+
+**（3）使用案例**
+
+初级应用：
+
+- 鼠标聚焦
+- 下拉菜单
+- 相对时间转换
+- 滚动动画
+
+高级应用：
+
+- 自定义指令实现图片懒加载
+- 自定义指令集成第三方插件
+
+
+
 ### 20.Vue中 scoped css原理
 
 在开发环境我们的组件会先经过 vue-loader 的处理，然后结合运行时的框架代码渲染到页面上
@@ -1940,9 +2023,13 @@ vue-loader 的底层使用了 Vue 官方提供的包（package） [@vue/componen
 
 `template` 会被编译成 `render` 函数，然后会根据 `render` 函数创建对应的 VNode，最后再由 VNode 渲染成真实的 DOM 在页面上：
 
-### 21.vue-cli实现原理
+### 38. template和jsx的有什么分别？
 
-[精简版](https://juejin.cn/post/6844904041823240205)
+对于 runtime 来说，只需要保证组件存在 render 函数即可，而有了预编译之后，只需要保证构建过程中生成 render 函数就可以。在 webpack 中，使用`vue-loader`编译.vue文件，内部依赖的`vue-template-compiler`模块，在 webpack 构建过程中，将template预编译成 render 函数。与 react 类似，在添加了jsx的语法糖解析器`babel-plugin-transform-vue-jsx`之后，就可以直接手写render函数。
+
+所以，template和jsx的都是render的一种表现形式，不同的是：JSX相对于template而言，具有更高的灵活性，在复杂的组件中，更具有优势，而 template 虽然显得有些呆滞。但是 template 在代码结构上更符合视图与逻辑分离的习惯，更简单、更直观、更好维护。
+
+
 
 ### 22.render函数触发过程
 
@@ -3364,9 +3451,66 @@ Vue3中移除了事件总线，但是可以借助于第三方工具来完成，V
 
 ## 路由
 
+### 1. Vue-Router 的懒加载如何实现
+
+非懒加载：
+
+```javascript
+import List from '@/components/list.vue'
+const router = new VueRouter({
+  routes: [
+    { path: '/list', component: List }
+  ]
+})
+复制代码
+```
+
+（1）方案一(常用)：使用箭头函数+import动态加载
+
+```javascript
+const List = () => import('@/components/list.vue')
+const router = new VueRouter({
+  routes: [
+    { path: '/list', component: List }
+  ]
+})
+复制代码
+```
+
+（2）方案二：使用箭头函数+require动态加载
+
+```javascript
+const router = new Router({
+  routes: [
+   {
+     path: '/list',
+     component: resolve => require(['@/components/list'], resolve)
+   }
+  ]
+})
+复制代码
+```
+
+（3）方案三：使用webpack的require.ensure技术，也可以实现按需加载。 这种情况下，多个路由指定相同的chunkName，会合并打包成一个js文件。
+
+```javascript
+// r就是resolve
+const List = r => require.ensure([], () => r(require('@/components/list')), 'list');
+// 路由也是正常的写法  这种是官方推荐的写的 按模块划分懒加载 
+const router = new Router({
+  routes: [
+  {
+    path: '/list',
+    component: List,
+    name: 'list'
+  }
+ ]
+}))
+```
+
 ### 1.hash和history模式区别
 
-Vue-Router有两种模式：**hash模式**和**history模式**。默认的路由模式是hash模式。
+Vue-Router有两种模式：**hash模式**和**history模式**。默认的路由模式是hash模式。	
 
 #### 1. hash模式
 
@@ -3740,6 +3884,149 @@ const router = new Router({
 - 全局前置/钩子：beforeEach、beforeResolve、afterEach
 - 路由独享的守卫：beforeEnter
 - 组件内的守卫：beforeRouteEnter、beforeRouteUpdate、beforeRouteLeave
+
+### 6. Vue-router 路由钩子在生命周期的体现
+
+一、Vue-Router导航守卫
+
+有的时候，需要通过路由来进行一些操作，比如最常见的登录权限验证，当用户满足条件时，才让其进入导航，否则就取消跳转，并跳到登录页面让其登录。 为此有很多种方法可以植入路由的导航过程：全局的，单个路由独享的，或者组件级的
+
+1. 全局路由钩子
+
+vue-router全局有三个路由钩子;
+
+- router.beforeEach 全局前置守卫 进入路由之前
+- router.beforeResolve 全局解析守卫（2.5.0+）在 beforeRouteEnter 调用之后调用
+- router.afterEach 全局后置钩子 进入路由之后
+
+具体使用∶
+
+- beforeEach（判断是否登录了，没登录就跳转到登录页）
+
+```javascript
+router.beforeEach((to, from, next) => {  
+    let ifInfo = Vue.prototype.$common.getSession('userData');  // 判断是否登录的存储信息
+    if (!ifInfo) { 
+        // sessionStorage里没有储存user信息    
+        if (to.path == '/') { 
+            //如果是登录页面路径，就直接next()      
+            next();    
+        } else { 
+            //不然就跳转到登录      
+            Message.warning("请重新登录！");     
+            window.location.href = Vue.prototype.$loginUrl;    
+        }  
+    } else {    
+        return next();  
+    }
+})
+复制代码
+```
+
+- afterEach （跳转之后滚动条回到顶部）
+
+```javascript
+router.afterEach((to, from) => {  
+    // 跳转之后滚动条回到顶部  
+    window.scrollTo(0,0);
+});
+复制代码
+```
+
+1. 单个路由独享钩子
+
+**beforeEnter** 如果不想全局配置守卫的话，可以为某些路由单独配置守卫，有三个参数∶ to、from、next
+
+```javascript
+export default [    
+    {        
+        path: '/',        
+        name: 'login',        
+        component: login,        
+        beforeEnter: (to, from, next) => {          
+            console.log('即将进入登录页面')          
+            next()        
+        }    
+    }
+]
+复制代码
+```
+
+1. 组件内钩子
+
+beforeRouteUpdate、beforeRouteEnter、beforeRouteLeave
+
+这三个钩子都有三个参数∶to、from、next
+
+- beforeRouteEnter∶ 进入组件前触发
+- beforeRouteUpdate∶ 当前地址改变并且改组件被复用时触发，举例来说，带有动态参数的路径foo/∶id，在 /foo/1 和 /foo/2 之间跳转的时候，由于会渲染同样的foa组件，这个钩子在这种情况下就会被调用
+- beforeRouteLeave∶ 离开组件被调用
+
+注意点，beforeRouteEnter组件内还访问不到this，因为该守卫执行前组件实例还没有被创建，需要传一个回调给 next来访问，例如：
+
+```javascript
+beforeRouteEnter(to, from, next) {      
+    next(target => {        
+        if (from.path == '/classProcess') {          
+            target.isFromProcess = true        
+        }      
+    })    
+}
+```
+
+二、Vue路由钩子在生命周期函数的体现
+
+1. 完整的路由导航解析流程（不包括其他生命周期）
+
+- 触发进入其他路由。
+- 调用要离开路由的组件守卫beforeRouteLeave
+- 调用局前置守卫∶ beforeEach
+- 在重用的组件里调用 beforeRouteUpdate
+- 调用路由独享守卫 beforeEnter。
+- 解析异步路由组件。
+- 在将要进入的路由组件中调用 beforeRouteEnter
+- 调用全局解析守卫 beforeResolve
+- 导航被确认。
+- 调用全局后置钩子的 afterEach 钩子。
+- 触发DOM更新（mounted）。
+- 执行beforeRouteEnter 守卫中传给 next 的回调函数
+
+1. 触发钩子的完整顺序
+
+路由导航、keep-alive、和组件生命周期钩子结合起来的，触发顺序，假设是从a组件离开，第一次进入b组件∶
+
+- beforeRouteLeave：路由组件的组件离开路由前钩子，可取消路由离开。
+- beforeEach：路由全局前置守卫，可用于登录验证、全局路由loading等。
+- beforeEnter：路由独享守卫
+- beforeRouteEnter：路由组件的组件进入路由前钩子。
+- beforeResolve：路由全局解析守卫
+- afterEach：路由全局后置钩子
+- beforeCreate：组件生命周期，不能访问tAis。
+- created;组件生命周期，可以访问tAis，不能访问dom。
+- beforeMount：组件生命周期
+- deactivated：离开缓存组件a，或者触发a的beforeDestroy和destroyed组件销毁钩子。
+- mounted：访问/操作dom。
+- activated：进入缓存组件，进入a的嵌套子组件（如果有的话）。
+- 执行beforeRouteEnter回调函数next。
+
+1. 导航行为被触发到导航完成的整个过程
+
+- 导航行为被触发，此时导航未被确认。
+- 在失活的组件里调用离开守卫 beforeRouteLeave。
+- 调用全局的 beforeEach守卫。
+- 在重用的组件里调用 beforeRouteUpdate 守卫(2.2+)。
+- 在路由配置里调用 beforeEnteY。
+- 解析异步路由组件（如果有）。
+- 在被激活的组件里调用 beforeRouteEnter。
+- 调用全局的 beforeResolve 守卫（2.5+），标示解析阶段完成。
+- 导航被确认。
+- 调用全局的 afterEach 钩子。
+- 非重用组件，开始组件实例的生命周期：beforeCreate&created、beforeMount&mounted
+- 触发 DOM 更新。
+- 用创建好的实例调用 beforeRouteEnter守卫中传给 next 的回调函数。
+- 导航完成
+
+
 
 ### 10.两种路由的工作原理
 
@@ -4238,6 +4525,48 @@ Action 函数接受一个与 store 实例具有相同方法和属性的 context 
 
 - Vuex中所有的状态更新的唯一途径都是mutation，异步操作通过 Action 来提交 mutation实现，这样可以方便地跟踪每一个状态的变化，从而能够实现一些工具帮助更好地了解我们的应用。
 - 每个mutation执行完成后都会对应到一个新的状态变更，这样devtools就可以打个快照存下来，然后就可以实现 time-travel 了。如果mutation支持异步操作，就没有办法知道状态是何时更新的，无法很好的进行状态的追踪，给调试带来困难。
+
+### 4. Redux 和 Vuex 有什么区别，它们的共同思想
+
+**（1）Redux 和 Vuex区别**
+
+- Vuex改进了Redux中的Action和Reducer函数，以mutations变化函数取代Reducer，无需switch，只需在对应的mutation函数里改变state值即可
+- Vuex由于Vue自动重新渲染的特性，无需订阅重新渲染函数，只要生成新的State即可
+- Vuex数据流的顺序是∶View调用store.commit提交对应的请求到Store中对应的mutation函数->store改变（vue检测到数据变化自动渲染）
+
+通俗点理解就是，vuex 弱化 dispatch，通过commit进行 store状态的一次更变;取消了action概念，不必传入特定的 action形式进行指定变更;弱化reducer，基于commit参数直接对数据进行转变，使得框架更加简易;
+
+**（2）共同思想**
+
+- 单—的数据源
+- 变化可以预测
+
+本质上：redux与vuex都是对mvvm思想的服务，将数据从视图中抽离的一种方案; 形式上：vuex借鉴了redux，将store作为全局的数据中心，进行mode管理;
+
+### 5. 为什么要用 Vuex 或者 Redux
+
+由于传参的方法对于多层嵌套的组件将会非常繁琐，并且对于兄弟组件间的状态传递无能为力。我们经常会采用父子组件直接引用或者通过事件来变更和同步状态的多份拷贝。以上的这些模式非常脆弱，通常会导致代码无法维护。
+
+所以需要把组件的共享状态抽取出来，以一个全局单例模式管理。在这种模式下，组件树构成了一个巨大的"视图"，不管在树的哪个位置，任何组件都能获取状态或者触发行为。
+
+另外，通过定义和隔离状态管理中的各种概念并强制遵守一定的规则，代码将会变得更结构化且易维护。
+
+### 7. Vuex和单纯的全局对象有什么区别？
+
+- Vuex 的状态存储是响应式的。当 Vue 组件从 store 中读取状态的时候，若 store 中的状态发生变化，那么相应的组件也会相应地得到高效更新。
+- 不能直接改变 store 中的状态。改变 store 中的状态的唯一途径就是显式地提交 (commit) mutation。这样可以方便地跟踪每一个状态的变化，从而能够实现一些工具帮助更好地了解我们的应用。
+
+### 9. Vuex的严格模式是什么,有什么作用，如何开启？
+
+在严格模式下，无论何时发生了状态变更且不是由mutation函数引起的，将会抛出错误。这能保证所有的状态变更都能被调试工具跟踪到。
+
+在Vuex.Store 构造器选项中开启,如下
+
+```php
+const store = new Vuex.Store({
+    strict:true,
+})
+```
 
 ### 5.基本注意
 
@@ -5414,6 +5743,24 @@ export default function Count () {
 1.  watchEffect不能获取数据改变之前的值。
 
 同时，watchEffect会返回一个对象watchEffectStop，通过执行watchEffectStop，我们可以控制监听在什么时候结束
+
+### 5. Composition API与React Hook很像，区别是什么
+
+从React Hook的实现角度看，React Hook是根据useState调用的顺序来确定下一次重渲染时的state是来源于哪个useState，所以出现了以下限制
+
+- 不能在循环、条件、嵌套函数中调用Hook
+- 必须确保总是在你的React函数的顶层调用Hook
+- useEffect、useMemo等函数必须手动确定依赖关系
+
+而Composition API是基于Vue的响应式系统实现的，与React Hook的相比
+
+- 声明在setup函数内，一次组件实例化只调用一次setup，而React Hook每次重渲染都需要调用Hook，使得React的GC比Vue更有压力，性能也相对于Vue来说也较慢
+- Compositon API的调用不需要顾虑调用顺序，也可以在循环、条件、嵌套函数中使用
+- 响应式系统自动实现了依赖收集，进而组件的部分的性能优化由Vue内部自己完成，而React Hook需要手动传入依赖，而且必须必须保证依赖的顺序，让useEffect、useMemo等函数正确的捕获依赖变量，否则会由于依赖不正确使得组件性能下降。
+
+虽然Compositon API看起来比React Hook好用，但是其设计思想也是借鉴React Hook的。
+
+
 
 ### 4.reactive和ref
 
