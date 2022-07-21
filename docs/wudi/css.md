@@ -2077,18 +2077,117 @@ z-index属性在下列情况下会失效：
 
 ![image-20220406152722989](https://s2.loli.net/2022/04/06/nl6YJEzBu9Roibr.png)
 
-### 3.怎么清除浮点
+## 四、如何清理浮动？
 
-float 属性用于定位和格式化内容，例如让图像向左浮动到容器中的文本那里。
+**清除浮动不是不用浮动，清除浮动产生的父容器高度塌陷**。
 
-float 属性可以设置以下值之一：
+### 套路1：给浮动元素的父元素添加高度（扩展性不好）
 
--   left - 元素浮动到其容器的左侧
--   right - 元素浮动在其容器的右侧
--   none - 元素不会浮动（将显示在文本中刚出现的位置）。默认值。
--   inherit - 元素继承其父级的 float 值
+如果一个元素要浮动，那么它的父元素一定要有高度。高度的盒子，才能关住浮动。可以通过直接给父元素设置height，实际应用中我们不大可能给所有的盒子加高度，不仅麻烦，并且不能适应页面的快速变化；另外一种，父容器的高度可以通过内容撑开（比如img图片），实际当中此方法用的比较多。
 
-#### 文档流
+### 套路2：clear:both;
+
+在最后一个子元素新添加最后一个冗余元素，然后将其设置clear:both,这样就可以清除浮动。这里强调一点，即**在父级元素末尾添加的元素必须是一个块级元素，否则无法撑起父级元素高度**。
+
+```ini
+	<div id="wrap">
+	    <div id="inner"></div>
+	    <div style="clear: both;"></div>
+	</div>
+复制代码
+	#wrap{
+	      border: 1px solid;
+	}
+	#inner{
+	      float: left;
+	      width: 200px;
+	      height: 200px;
+	      background: pink;
+	}
+复制代码
+```
+
+### 套路3：伪元素清除浮动
+
+上面那种办法固然可以清除浮动，但是我们不想在页面中添加这些没有意义的冗余元素，此时如何清除浮动吗？ **结合 :after 伪元素和 IEhack ，可以完美兼容当前主流的各大浏览器，这里的 IEhack 指的是触发 hasLayout**。
+
+```bash
+<div id="wrap" class="clearfix">
+    <div id="inner"></div>
+</div>
+复制代码
+      #wrap {
+        border: 1px solid;
+      }
+      #inner {
+        float: left;
+        width: 200px;
+        height: 200px;
+        background: pink;
+      }
+      /*开启haslayout*/
+      .clearfix {
+        *zoom: 1;
+      }
+      /*ie6 7 不支持伪元素*/
+      .clearfix:after {
+        content: '';
+        display: block;
+        clear: both;
+        height:0;
+        line-height:0;
+        visibility:hidden;//允许浏览器渲染它，但是不显示出来
+      }
+复制代码
+```
+
+给浮动元素的父容器添加一个clearfix的class，然后给这个class添加一个:after伪元素，实现元素末尾添加一个看不见的块元素来清理浮动。这是通用的清理浮动方案，推荐使用
+
+### 套路4：给父元素使用overflow:hidden;
+
+这种方案让父容器形成了BFC（块级格式上下文），而BFC可以包含浮动，通常用来解决浮动父元素高度坍塌的问题。
+
+**BFC的触发方式**
+
+我们可以给父元素添加以下属性来触发BFC：
+
+- float 为 left | right
+- overflow 为 hidden | auto | scorll
+- display 为 table-cell | table-caption | inline-block
+- position 为 absolute | fixed
+
+这里可以给父元素设置overflow:auto，但是为了兼容IE最好使用overflow:hidden。
+
+**但这种办法有个缺陷：如果有内容出了盒子，用这种方法就会把多的部分裁切掉，所以这时候不能使用。**
+
+**BFC的主要特征:**
+
+- BFC容器是一个隔离的容器，和其他元素互不干扰；所以我们可以用触发两个元素的BFC来解决垂直边距折叠问题。
+- BFC不会重叠浮动元素
+- BFC可以包含浮动,这可以清除浮动。
+
+### 套路5：br标签清浮动
+
+**br标签存在一个属性：clear。这个属性就是能够清除浮动的利器，在br标签中设置属性clear，并赋值all。即能清除掉浮动**。
+
+```ini
+    <div id="wrap">
+      <div id="inner"></div>
+      <br clear="all" />
+    </div>
+复制代码
+      #wrap {
+        border: 1px solid;
+      }
+      #inner {
+        float: left;
+        width: 200px;
+        height: 200px;
+        background: pink;
+      }
+```
+
+## 文档流
 
 ##### 一 normal flow
 
