@@ -1932,9 +1932,170 @@ v-cloak 指令设置样式，样式会在 Vue 实例编译结束时，从 HTML �
 </style>
 ```
 
-### 17.执行命令后浏览器渲染显示出页面的过程
+### 17.Vue的渲染过程
 
 [vue渲染过程](https://segmentfault.com/a/1190000018495383)
+
+Vue 推荐在绝大多数情况下使用 template 来创建你的 HTML。但是模板毕竟是模板，不是真实的dom节点。从模板到真实dom节点还需要经过一些步骤
+
+1. 把模板编译为render函数
+2. 实例进行挂载, 根据根节点render函数的调用，递归的生成虚拟dom
+3. 对比虚拟dom，渲染到真实dom
+4. 组件内部data发生变化，组件和子组件引用data作为props重新调用render函数，生成虚拟dom, 返回到步骤3
+
+## 第一步: 模板到render
+
+在我们使用Vue的组件化进行开发应用的时候, 如果仔细的查看我们要引入的组件, 例子如下
+
+```javascript
+// App.vue 
+<template>
+    <div>
+        hello word
+    </div>
+</template>
+
+<script>
+
+export default {
+}
+
+</script>
+
+<style>
+
+</style>
+```
+
+在我们的主入口main.js
+
+```javascript
+import Vue from 'vue'
+import App from './App'
+
+console.log(App)
+
+new Vue({
+  render: h => h(App)
+}).$mount('#app')
+```
+
+![clipboard.png](https://s2.loli.net/2022/07/22/SBFnwXedpxs8fGK.png)
+
+我们能够看到在我们引入的App这个模块，里面是一个对象，对象里面存在一个方法叫做render。在说render函数之前，我们可以想一想，每一次加载一个组件，然后对模板进行解析，解析完后，生成Dom，挂载到页面上。这样会导致效率很低效。而使用Vue-cli进行组件化开发，在我们引入组件的后，其实会有一个解析器(`vue-loader`)对此模板进行了解析，生成了render函数。当然，如果没有通过解析器解析为render函数，也没有关系，在组件第一次挂载的时候，Vue会自己进行解析。源码请参考: [https://github.com/vuejs/vue/...](https://link.segmentfault.com/?enc=zJM7gE6r0HURaRJ7vOqgyw%3D%3D.KXezcBZLFlnOAPSXvcwPmB1Ys7yOY3c0gLeqcim9sDI8Q5HuwybujVipn4dAWwlfVyzUEOGAkdZNCJzVkTKH40q19ibBqn16Ruv7kkU9BSZpYLVT6ihX0sJ5Fx0maygi)
+这样，能保证组件每次调用的都是render函数，使用render函数生成VNode。
+
+## 第二步：虚拟节点VNode
+
+我们把Vue的实例挂载到`#app`, 会调用实例里面的render方法，生成虚拟DOM。来看看什么是虚拟节点，把例子修改一下。
+
+```arcade
+new Vue({
+  render: h => {
+    let root = h(App)
+    console.log('root:', root)
+    return root
+  }
+}).$mount('#app')
+```
+
+![clipboard.png](https://s2.loli.net/2022/07/22/xlLApSXoY98sKeC.png)
+
+上面生成的VNode就是虚拟节点，虚拟节点里面有一个属性**`elm`**, 这个属性指向真实的DOM节点。因为VNode指向了真实的DOM节点，那么虚拟节点经过对比后，生成的DOM节点就可以直接进行替换。
+**这样有什么好处呢？**
+一个组件对象，如果内部的`data`发生变化，触发了render函数，重新生成了VNode节点。那么就可以直接找到所对应的节点，然后直接替换。那么这个过程只会在本组件内发生，不会影响其他的组件。于是组件与组件是隔离的。
+例子如下:
+
+```javascript
+// main.js
+const root = new Vue({
+  data: {
+    state: true
+  },
+  mounted() {
+    setTimeout(() => {
+      console.log(this)
+      this.state = false
+    }, 1000)
+  },
+  render: function(h) {
+    const { state } = this // state 变化重新触发render
+    let root = h(App)
+    console.log('root:', root)
+    return root
+  }
+}).$mount('#app')
+// App.vue
+<script>
+export default {
+  render: (h) => {
+    let app = h('h1', ['hello world'])
+    console.log('app:', app)
+    return app
+  }
+}
+</script>
+```
+
+![clipboard.png](https://s2.loli.net/2022/07/22/64bNVi1WaIzljEC.png)
+我们可以看到，当`main.js`中重新触发render函数的时候，render方法里面有引用App.vue这个子组件。但是并没有触发App.vue组件的的render函数。
+
+**`在一个组件内，什么情况会触发render?`**。
+
+## 如何才能触发组件的render
+
+数据劫持是Vue的一大特色，原理官方已经讲的很多了[深入响应式原理](https://link.segmentfault.com/?enc=TVGAgYV6EWmwbqTYDsvvwA%3D%3D.bxYehXOny7hcoA3swKzfZN8bVrSGDMpfdEqTCJg%2F9buXLGcl3RJi1YFfSlACMhZO)。在我们给组件的data的属性进行的赋值的时候(set)，此属性如果在组件内部初次渲染过程被引用(`data的属性被访问，也就是数据劫持的get`), 包括生命周期方法或者render方法。于是会触发组件的update(beforeUpdate -> render -> updated)。
+
+> 注: 为了防止data被多次set从而触发多次update, Vue把update存放到异步队列中。这样就能保证多次data的set只会触发一次update。
+
+**`当props会触发组件的重新渲染是怎么发生的呢？`**
+
+把父组件的data通过props传递给子组件的时候，子组件在初次渲染的时候生命周期或者render方法，有调用data相关的props的属性, 这样子组件也被添加到父组件的data的相关属性依赖中，这样父组件的data在set的时候，就相当于触发自身和子组件的update。
+例子如下:
+
+```javascript
+// main.vue
+import Vue from 'vue'
+import App from './App'
+
+const root = new Vue({
+  data: {
+    state: false
+  },
+  mounted() {
+    setTimeout(() => {
+      this.state = true
+    }, 1000)
+  },
+  render: function(h) {
+    const { state } = this // state 变化重新触发render
+    let root = h(App, { props: { status: state } })
+    console.log('root:', root)
+    return root
+  }
+}).$mount('#app')
+
+window.root = root
+// App.vue
+<script>
+export default {
+  props: {
+    status: Boolean
+  },
+  render: function (h){
+    const { status } = this
+    let app = h('h1', ['hello world'])
+    console.log('app:', app)
+    return app
+  }
+}
+</script>
+```
+
+截图如下:
+
+![clipboard.png](https://s2.loli.net/2022/07/22/tCd48DWF9oA7gLZ.png)
+在`main.js`中 **state** 状态发生了变化，由`false` => `true`, 触发了**自身**与**子组件**的render方法。
 
 ### 18.修改后页面保存渲染的原理
 
