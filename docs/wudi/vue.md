@@ -1078,7 +1078,7 @@ LRU 缓存策略∶ 从内存中找出最久未使用的数据并置换新的数
 
 **打印的结果是begin, 而不是我们设置的end。**这个结果足以说明Vue中DOM的更新并非同步
 
-ue异步执行DOM更新。只要观察到数据变化，Vue将开启一个队列，并缓冲在同一事件循环中发生的所有数据改变。如果同一个watcher被多次触发，只会被推入到队列中一次。这种在缓冲时去除重复数据对于避免不必要的计算和DOM操作上非常重要。然后，在下一个的事件循环“tick”中，Vue刷新队列并执行实际 (已去重的) 工作
+Vue异步执行DOM更新。只要观察到数据变化，Vue将开启一个队列，并缓冲在同一事件循环中发生的所有数据改变。如果同一个watcher被多次触发，只会被推入到队列中一次。这种在缓冲时去除重复数据对于避免不必要的计算和DOM操作上非常重要。然后，在下一个的事件循环“tick”中，Vue刷新队列并执行实际 (已去重的) 工作
 
 Vue 的 nextTick 其本质是对 JavaScript 执行原理 EventLoop 的一种应用。
 
@@ -1114,9 +1114,40 @@ nextTick 接收一个回调函数作为参数，并将这个回调函数延迟�
 
 nextTick 提供了四种异步方法 Promise.then、MutationObserver、setImmediate、setTimeOut(fn,0)
 
-源码解析
+## 三、nextTick 实现原理
 
-```js
+将传入的回调函数包装成异步任务，异步任务又分微任务和宏任务，为了尽快执行所以优先选择微任务； `nextTick` 提供了四种异步方法 `Promise.then`、`MutationObserver`、`setImmediate`、`setTimeOut(fn,0)`
+
+### 3.1 Vue.nextTick 内部逻辑
+
+在执行 `initGlobalAPI(Vue)` 初始化 Vue 全局 API 中，这么定义 `Vue.nextTick` ：
+
+```javascript
+function initGlobalAPI(Vue) {
+    //...
+    Vue.nextTick = nextTick;
+}
+复制代码
+```
+
+可以看出是直接把 nextTick 函数赋值给 Vue.nextTick，就可以了，非常简单。
+
+### 3.2 vm.$nextTick 内部逻辑
+
+```javascript
+Vue.prototype.$nextTick = function (fn) {
+    return nextTick(fn, this)
+};
+复制代码
+```
+
+可以看出是`vm.$nextTick`内部也是调用 `nextTick` 函数。
+
+### 3.3 源码解读
+
+`nextTick` 的源码位于 `src/core/util/next-tick.js` `nextTick` 源码主要分为两块：
+
+```javascript
 import { noop } from 'shared/util'
 import { handleError } from './error'
 import { isIE, isIOS, isNative } from './env'
@@ -1126,7 +1157,6 @@ import { isIE, isIOS, isNative } from './env'
 //  handleError 错误处理函数
 //  isIE, isIOS, isNative 环境判断函数，
 //  isNative 判断是否原生支持，如果通过第三方实现支持也会返回 false
-
 
 export let isUsingMicroTask = false     // nextTick 最终是否以微任务执行
 
@@ -1164,7 +1194,18 @@ export function nextTick(cb?: Function, ctx?: Object) {
     }
 }
 
+复制代码
+```
 
+可以看到在 `nextTick` 函数中把通过参数 cb 传入的函数，做一下包装然后 push 到 `callbacks` 数组中。
+
+然后用变量 pending 来保证执行一个事件循环中只执行一次 timerFunc()。
+
+最后执行 `if (!cb && typeof Promise !== 'undefined')`，判断参数 `cb`不存在且浏览器支持 Promise，则返回一个 Promise 类实例化对象。例如 `nextTick().then(() => {})`，当 `_resolve` 函数执行，就会执行 then 的逻辑中。
+
+来看一下 `timerFunc` 函数的定义，先只看用 Promise 创建一个异步执行的 `timerFunc` 函数 。
+
+```javascript
 // 判断当前环境优先支持的异步方法，优先选择微任务
 // 优先级：Promise---> MutationObserver---> setImmediate---> setTimeout
 // setTimeOut 最小延迟也要4ms，而 setImmediate 会在主线程执行完后立刻执行
@@ -1214,7 +1255,23 @@ if (typeof Promise !== 'undefined' && isNative(Promise)) {  // 支持 promise
     timerFunc = () => { setTimeout(flushCallbacks, 0) }
 }
 
+复制代码
+```
 
+其中 `isNative` 方法是如何定义，代码如下。
+
+```javascript
+function isNative(Ctor) {
+    return typeof Ctor === 'function' && /native code/.test(Ctor.toString())
+}
+复制代码
+```
+
+在其中发现 `timerFunc` 函数就是用各种异步执行的方法调用 `flushCallbacks` 函数。
+
+来看一下 `flushCallbacks` 函数
+
+```javascript
 // 如果多次调用 nextTick，会依次执行上面的方法，将 nextTick 的回调放在 callbacks 数组中
 // 最后通过 flushCallbacks 函数遍历 callbacks 数组的拷贝并执行其中的回调
 function flushCallbacks() {
@@ -1233,10 +1290,39 @@ function flushCallbacks() {
 // 如果 nextTick 回调中又调用了一次 nextTick，则又会向 callbacks 中添加回调，
 // nextTick 回调中的 nextTick 应该放在下一轮执行，
 // 如果不将 callbacks 复制一份就可能一直循环
-
+复制代码
 ```
 
+执行 `pending = false` 使下个事件循环中能 `nextTick` 函数中调用 `timerFunc` 函数。 执行 `var copies = callbacks.slice(0);callbacks.length = 0`; 把要异步执行的函数集合 `callbacks`克隆到常量 `copies`，然后把 `callbacks` 清空。 然后遍历 `copies` 执行每一项函数。回到 `nextTick` 中是把通过参数 `cb` 传入的函数包装后 push 到 `callbacks` 集合中。来看一下怎么包装的。
 
+```javascript
+function() {
+    if (cb) {
+        try {
+            cb.call(ctx);
+        } catch (e) {
+            handleError(e, ctx, 'nextTick');
+        }
+    } else if (_resolve) {
+        _resolve(ctx);
+    }
+}
+复制代码
+```
+
+逻辑很简单。若参数 cb 有值。在 try 语句中执行 `cb.call(ctx)` ，参数 ctx 是传入函数的参数。 如果执行失败执行 `handleError(e, ctx, 'nextTick')`。
+
+若参数 cb 没有值。执行 `_resolve(ctx)`，因为在 `nextTick` 函数中如何参数 cb 没有值，会返回一个 Promise 类实例化对象，那么执行 `_resolve(ctx)`，就会执行 then 的逻辑中。
+
+到这里 `nextTick` 函数的主线逻辑就很清楚了。定义一个变量 `callbacks`，把通过参数 cb 传入的函数用一个函数包装一下，在这个中会执行传入的函数，及处理执行失败和参数 cb 不存在的场景，然后 添加到 callbacks。
+
+调用 `timerFunc` 函数，在其中遍历 `callbacks` 执行每个函数，因为 `timerFunc` 是一个异步执行的函数，且定义一个变量 `pending` 来保证一个事件循环中只调用一次 `timerFunc` 函数。这样就实现了 `nextTick` 函数异步执行传入的函数的作用了。
+
+那么其中的关键还是怎么定义 `timerFunc` 函数。因为在各浏览器下对创建异步执行函数的方法各不相同，要做兼容处理，下面来介绍一下各种方法。
+
+### 3.4 为什么优先使用微任务：
+
+按照上面事件循环的执行顺序，执行下一次宏任务之前会执行一次 UI 渲染，等待时长比微任务要多很多。所以在能使用微任务的时候优先使用微任务，不能使用微任务的时候才使用宏任务，优雅降级。*
 
 ### 8.data为什么是一个函数而不是一个对象？
 
@@ -4531,42 +4617,13 @@ init() {
 
 ## Vuex
 
-### 1.Vuex基本原理，有哪些属性，为什么用Vuex
-
-有什么状态时需要我们在多个组件间共享呢？
-
-比如用户的登录状态、用户名称、头像、地理位置等等。
-
-比如商品的收藏、购物车中的物品等等。
-
-这些状态信息，我们都可以放在统一的地方，对它进行保护管理，而且它们还是响应式的。
-
-以下是一个表示“单向数据流”理念的极简示意：
-
-但是，当我们的应用遇到多个组件共享状态时，单向数据流的简洁性很容易被破坏：
-- 多个视图依赖于同一状态。
-- 来自不同视图的行为需要变更同一状态。
-对于问题一，传参的方法对于多层嵌套的组件将会非常繁琐，并且对于兄弟组件间的状态传递无能为力。
-
-对于问题二，我们经常会采用父子组件直接引用或者通过事件来变更和同步状态的多份拷贝。以上的这些模式非常脆弱，通常会导致无法维护的代码。
-
-
-
-因此，我们为什么不把组件的共享状态抽取出来，以一个全局单例模式管理呢？在这种模式下，我们的组件树构成了一个巨大的“视图”，不管在树的哪个位置，任何组件都能获取状态或者触发行为！
-
-另外，通过定义和隔离状态管理中的各种概念并强制遵守一定的规则，我们的代码将会变得更结构化且易维护。
-
-这就是 Vuex 背后的基本思想，借鉴了 Flux、Redux、和 The Elm Architecture。与其他模式不同的是，Vuex 是专门为 Vue.js 设计的状态管理库，以利用 Vue.js 的细粒度数据响应机制来进行高效的状态更新。
-
-什么情况下应该使用 Vuex？
+### 1.什么情况下应该使用 Vuex？
 
 虽然 Vuex 可以帮助我们管理共享状态，但也附带了更多的概念和框架。这需要对短期和长期效益进行权衡。
 
 如果您不打算开发大型单页应用，使用 Vuex 可能是繁琐冗余的。确实是如此——如果您的应用够简单，您最好不要使用 Vuex。一个简单的 global event bus 就足够您所需了。但是，如果您需要构建是一个中大型单页应用，您很可能会考虑如何更好地在组件外部管理状态，Vuex 将会成为自然而然的选择。引用 Redux 的作者 Dan Abramov 的话说就是：
 
-Flux 架构就像眼镜：您自会知道什么时候需要它。
-
-
+### 1.Vuex基本原理，有哪些属性，为什么用Vuex
 
 使用 vue/react 等框架，需要关注点基本就是数据，因为框架解决了数据和页面更新的实现。页面和数据的关系是y=f(x)
 
@@ -4967,20 +5024,6 @@ new Vue({
 
   **3. 在 Vue 的实例化时，添加 store 属性；**
 
-#### 1.3、 如何解决下列问题
-
-  在对 Vuex 有了认知之后，带着以下几个问题，开始源码阅读之旅。
-
-  **1. Vuex 是如何运行的，组件实例上如何能通过 this.$store 获取 store 的实例？**
-
-  **2. 构建了怎样的单一状态树，如何实现模块化管理？**
-
-  **3. context 与 store 实例有什么区别？**
-
-  **4. 如何实现数据响应式？**
-
-  **5. 辅助类的函数式如何实现？**
-
 ### 2、Vuex 的注册
 
    Vuex 使用时，必须显示的调用  Vue.use() ，所有本质来讲 Vuex 其实就是 vue 的一个插件（plugin），插件注册时会调用插件的 install 方法；Vuex 的 install 方法如下：
@@ -5043,11 +5086,9 @@ export default function (Vue) {
 
    首先通过 version 判断当前 Vue 的版本，如果是 2.x 及以上的版本，通过 mixin 全局混入 hooks - beforeCreate ； 如果是 1.x 及以下的版本，则通过改写 _init 方法。两种方式的处理，目的都是在组件初始化前，调用 vuexInit 方法。此时的 this 对应的就是 Vue 的实例 （beforeCreate 方法执行时）， options 即 Vue 实例化时传入的参数，如果存在 store 属性的话，则将 this.$store 设置为 store 实例。
 
-   其中 store 就是调用 new Vuex.Store(options) 构造函数（Class）返回的对象，至于 store 中如何实现，下边篇幅会继续介绍。
+   其中 store 就是调用 new Vuex.Store(options) 构造函数（Class）返回的对象
 
-   **到这里就解释了问题1 ：Vuex 是如何运行的，组件实例上如何能通过 this.$store 获取 store 的实例？**
 
-   **Vuex 作为一个 Vue 的插件，通过 Vue.use(Vuex) 注册时，为组件添加初始化方法，在初始化方法中在当前组件的实例 （this）上添加 store属性，并将其指向newVuex.Store()返回的实例store，这是每个组件中都能通过this.store 属性，并将其指向 new Vuex.Store() 返回的实例 store ，这是每个组件中都能通过 this.store属性，并将其指向newVuex.Store()返回的实例store，这是每个组件中都能通过this.store 访问 store 实例的原因。**
 
 ### 3、Vuex.Store 的实例化
 
@@ -5231,7 +5272,7 @@ function registerAction (store, type, handler, local) {
 复制代码
 ```
 
-   action 的 handler 中注入了更多的参数，包括 context （local相关的）和 root （store） 的属性。并通过 promise 进行包装，这也意味着，dispatch 触发的action，可支持 promise 的处理。
+   action 的 handler 中注入了更多的参数，包括 context （local相关的）和 root （store） 的属性。并通过 promise.all 进行包装，这也意味着，dispatch 触发的action，可支持 promise 的处理。
 
 ##### 3.2.4、getter的注册：registerGetter
 
