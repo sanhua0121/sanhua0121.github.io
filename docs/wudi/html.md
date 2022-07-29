@@ -253,7 +253,67 @@ Web Worker 的意义在于可以将一些耗时的数据处理操作从主线程
 
 ### 8.多个标签页怎么进行通信
 
+## BroadCast Channel
 
+BroadcastChannel 接口代理了一个命名频道，**可以让指定 origin 下的任意 browsing context 来订阅它。它允许同源的不同浏览器窗口，Tab页，frame或者 iframe 下的不同文档之间相互通信**。通过触发一个 message 事件，消息可以广播到所有监听了该频道的 BroadcastChannel 对象。
+
+说到 BroadCast Channel 不得不说一下 postMessage，他们二者的最大区别就在于 postMessage 更像是点对点的通信，而 BroadCast Channel 是广播的方式，点到面。
+
+### 语法
+
+```javascript
+// 创建
+const broadcastChannel = new BroadcastChannel('channelName');
+
+// 监听消息
+broadcastChannel.onmessage = function(e) {
+    console.log('监听消息:', e.data);
+};
+
+// 发送消息
+broadcastChannel.postMessage('测试：传送消息');
+
+// 关闭
+broadcastChannel.close();
+复制代码
+<div id="app"></div>
+  <button id="tab">新开 Tab</button>
+  <button id="l-btn">发送消息</button>
+  <button id="s-btn">关闭</button>
+  <script>
+    // 创建
+    const broadcastChannel = new BroadcastChannel('channelName');
+
+    // 监听消息
+    broadcastChannel.onmessage = function(e) {
+        console.log('监听消息:', e.data);
+    };
+
+    document.getElementById('tab').onclick = function () {
+      window.open('xxx');
+    }
+
+    document.getElementById('l-btn').onclick = function () {
+      // 发送消息
+      broadcastChannel.postMessage('测试，传送消息，我发送消息啦。。。');
+    }
+
+    document.getElementById('s-btn').onclick = function () {
+      // 关闭
+      broadcastChannel.close();
+    }
+
+  </script>
+复制代码
+```
+
+![Broadcast Channel.gif](https://s2.loli.net/2022/07/29/ulAQWyEP2iaH6ZT.webp) ![Broadcast Channel1.gif](https://s2.loli.net/2022/07/29/6e5hiYkrDcH9aNu.webp)
+
+### Tips
+
+1. 监听消息除了 .onmessage 这种方式，还可以 使用addEventListener来添加'message'监听，
+2. 关闭除了使用 Broadcast Channel 实例为我们提供的 close 方法来关闭 Broadcast Channel。我们还可取消或者修改相应的'message'事件监听。两者是有区别的：取消'message'监听只是让页面不对广播消息进行响应，Broadcast Channel 仍然存在；而调用 close 方法会切断与 Broadcast Channel 的连接，浏览器才能够尝试回收该对象，因为此时浏览器才会知道用户已经不需要使用广播频道了。
+3. 兼容性：如果不使用 IE 和 sf on iOS 浏览器，兼容性还是可以的
 
 ### 9.canvas和svg有什么区别
 
