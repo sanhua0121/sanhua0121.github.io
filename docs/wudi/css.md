@@ -748,9 +748,7 @@ flex属性是`flex-grow`, `flex-shrink` 和 `flex-basis`的简写, 默认值是`
 - link是XHTML标签，无兼容问题；@import是在CSS2.1提出的，低版本的浏览器不支持。
 - link支持使用Javascript控制DOM去改变样式；而@import不支持。
 
-### 9.css动画
-
-#### transition和animation的区别
+### 9.transition和animation的区别
 
 - **transition是过度属性**，强调过度，它的实现需要触发一个事件（比如鼠标移动上去，焦点，点击等）才执行动画。它类似于flash的补间动画，设置一个开始关键帧，一个结束关键帧。
 - **animation是动画属性**，它的实现不需要触发事件，设定好时间之后可以自己执行，且可以循环一个动画。它也类似于flash的补间动画，但是它可以设置多个关键帧（用@keyframe定义）完成动画。
