@@ -387,6 +387,20 @@ obj instanceof Array
 Array.prototype.isPrototypeOf(obj)
 ```
 
+### 3.数组的遍历方法有哪些
+
+| **方法**                  | **是否改变原数组** | **特点**                                                     |
+| ------------------------- | ------------------ | ------------------------------------------------------------ |
+| forEach()                 | 否                 | 数组方法，不改变原数组，没有返回值                           |
+| map()                     | 否                 | 数组方法，不改变原数组，有返回值，可链式调用                 |
+| filter()                  | 否                 | 数组方法，过滤数组，返回包含符合条件的元素的数组，可链式调用 |
+| for...of                  | 否                 | for...of遍历具有Iterator迭代器的对象的属性，返回的是数组的元素、对象的属性值，不能遍历普通的obj对象，将异步循环变成同步循环 |
+| every() 和 some()         | 否                 | 数组方法，some()只要有一个是true，便返回true；而every()只要有一个是false，便返回false. |
+| find() 和 findIndex()     | 否                 | 数组方法，find()返回的是第一个符合条件的值；findIndex()返回的是第一个返回条件的值的索引值 |
+| reduce() 和 reduceRight() | 否                 | 数组方法，reduce()对数组正序操作；reduceRight()对数组逆序操作 |
+
+
+
 ### 4.null和undefined区别
 
 首先 Undefined 和 Null 都是基本数据类型，**这两个基本数据类型分别都只有一个值，就是 undefined 和 null。**
