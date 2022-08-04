@@ -2532,17 +2532,86 @@ JavaScript 运行时，除了一个正在运行的主线程，引擎还提供一
 区别
 并发和并行是即相似又有区别的两个概念，并行是指两个或者多个事件在同一时刻发生；而并发是指两个或多个事件在同一时间间隔内发生。在多道程序环境下，并发性是指在一段时间内宏观上有多个程序在同时运行，但在单处理机系统中，每一时刻却仅能有一道程序执行，故微观上这些程序只能是分时地交替执行。倘若在计算机系统中有多个处理机，则这些可以并发执行的程序便可被分配到多个处理机上，实现并行执行，即利用每个处理机来处理一个可并发执行的程序，这样，多个程序便可以同时执行。所以微观上说，多核CPU可以同时执行多个进程，进程数与CPU核数相当。但宏观上说，由于CPU会分时间片执行多个进程，所以实际执行进程个数会远多于CPU核数。
 
-### 8.setTimeOut setInterval有什么区别
+### 8. setTimeout、setInterval、requestAnimationFrame 各有什么特点？
 
 异步编程当然少不了定时器了，常见的定时器函数有 `setTimeout`、`setInterval`、`requestAnimationFrame`。最常用的是`setTimeout`，很多人认为 `setTimeout` 是延时多久，那就应该是多久后执行。
 
 其实这个观点是错误的，因为 JS 是单线程执行的，如果前面的代码影响了性能，就会导致 `setTimeout` 不会按期执行。当然了，可以通过代码去修正 `setTimeout`，从而使定时器相对准确：
 
-`setInterval`，其实这个函数作用和 `setTimeout` 基本一致，只是该函数是每隔一段时间执行一次回调函数。
+```javascript
+let period = 60 * 1000 * 60 * 2
+let startTime = new Date().getTime()
+let count = 0
+let end = new Date().getTime() + period
+let interval = 1000
+let currentInterval = interval
+function loop() {
+  count++
+  // 代码执行所消耗的时间
+  let offset = new Date().getTime() - (startTime + count * interval);
+  let diff = end - new Date().getTime()
+  let h = Math.floor(diff / (60 * 1000 * 60))
+  let hdiff = diff % (60 * 1000 * 60)
+  let m = Math.floor(hdiff / (60 * 1000))
+  let mdiff = hdiff % (60 * 1000)
+  let s = mdiff / (1000)
+  let sCeil = Math.ceil(s)
+  let sFloor = Math.floor(s)
+  // 得到下一次循环所消耗的时间
+  currentInterval = interval - offset 
+  console.log('时：'+h, '分：'+m, '毫秒：'+s, '秒向上取整：'+sCeil, '代码执行时间：'+offset, '下次循环间隔'+currentInterval) 
+  setTimeout(loop, currentInterval)
+}
+setTimeout(loop, currentInterval)
+复制代码
+```
 
-通常来说不建议使用 `setInterval`。第一，它和 `setTimeout` 一样，不能保证在预期的时间执行任务。第二，它存在执行累积的问题
+接下来看 `setInterval`，其实这个函数作用和 `setTimeout` 基本一致，只是该函数是每隔一段时间执行一次回调函数。
 
-有循环定时器的需求，其实完全可以通过 `requestAnimationFrame` 来实现
+通常来说不建议使用 `setInterval`。第一，它和 `setTimeout` 一样，不能保证在预期的时间执行任务。第二，它存在执行累积的问题，请看以下伪代码
+
+```javascript
+function demo() {
+  setInterval(function(){
+    console.log(2)
+  },1000)
+  sleep(2000)
+}
+demo()
+复制代码
+```
+
+以上代码在浏览器环境中，如果定时器执行过程中出现了耗时操作，多个回调函数会在耗时操作结束以后同时执行，这样可能就会带来性能上的问题。
+
+如果有循环定时器的需求，其实完全可以通过 `requestAnimationFrame` 来实现：
+
+```javascript
+function setInterval(callback, interval) {
+  let timer
+  const now = Date.now
+  let startTime = now()
+  let endTime = startTime
+  const loop = () => {
+    timer = window.requestAnimationFrame(loop)
+    endTime = now()
+    if (endTime - startTime >= interval) {
+      startTime = endTime = now()
+      callback(timer)
+    }
+  }
+  timer = window.requestAnimationFrame(loop)
+  return timer
+}
+let a = 0
+setInterval(timer => {
+  console.log(1)
+  a++
+  if (a === 3) cancelAnimationFrame(timer)
+}, 1000)
+复制代码
+```
+
+首先 `requestAnimationFrame` 自带函数节流功能，基本可以保证在 16.6 毫秒内只执行一次（不掉帧的情况下），并且该函数的延时效果是精确的，没有其他定时器时间不准的问题，当然你也可以通过该函数来实现 `setTimeout`。
 
 ------
 
