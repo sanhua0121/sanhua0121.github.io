@@ -7811,6 +7811,18 @@ react可以通过高阶组件（Higher Order Components-- HOC）来扩展，而v
 -   React ==> React Native
 -   Vue ==> Weex
 
+**React的更新粒度**
+
+而 React 在类似的场景下是`自顶向下的进行递归更新的`，也就是说，React 中假如 `ChildComponent` 里还有十层嵌套子元素，那么所有层次都会递归的重新render（在不进行手动优化的情况下），这是性能上的灾难。（因此，React 创造了`Fiber`，创造了`异步渲染`，其实本质上是弥补被自己搞砸了的性能）。
+
+他们能用收集依赖的这套体系吗？不能，因为他们遵从`Immutable`的设计思想，永远不在原对象上修改属性，那么基于 `Object.defineProperty` 或 `Proxy` 的响应式依赖收集机制就无从下手了（你永远返回一个新的对象，我哪知道你修改了旧对象的哪部分？）
+
+同时，由于没有响应式的收集依赖，React 只能递归的把所有子组件都重新 `render`一遍（除了memo和shouldComponentUpdate这些优化手段），然后再通过 `diff算法` 决定要更新哪部分的视图，这个递归的过程叫做 `reconciler`，听起来很酷，但是性能很灾难。
+
+**Vue的更新粒度**
+
+那么，Vue 这种精确的更新是怎么做的呢？其实每个组件都有自己的`渲染 watcher`，它掌管了当前组件的视图更新，但是并不会掌管 `ChildComponent` 的更新。
+
 ## Demo实现
 
 
