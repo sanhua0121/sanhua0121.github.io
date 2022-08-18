@@ -1204,7 +1204,6 @@ exports.chunk2=chunk2;
   - 编译完成后通过`socket`向客户端推送当前编译的`hash戳`
 
 - 客户端的websocket监听到有文件改动推送过来的hash戳，会和上一次对比
-
   - 一致则走缓存
   - 不一致则通过`ajax`和`jsonp`向服务端获取最新资源
 
@@ -2308,6 +2307,7 @@ entry: {
 
 
 ```js
+
         // 多入口 - 生成 index.html
         new HtmlWebpackPlugin({
             template: path.join(srcPath, 'index.html'),
@@ -3178,7 +3178,7 @@ export const age = "title_age";
 5. 加载完，就去执行这段jsonp，主要就是把moduleId和module内容存到modules数组中，然后再去走webpack内置的require。
 
 6. webpack内置的require，主要是先判断缓存，这个moduleId是否缓存过了，如果缓存过了，就直接返回。如果没有缓存，再继续往下走，也就是加载module内容，然后最终内容会挂在都module,exports上，返回module.exports就返回了引用文件的最终执行结果。
-
+  
 
 - 入口文件
 
