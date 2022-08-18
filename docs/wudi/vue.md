@@ -7578,87 +7578,84 @@ export function render(_ctx, _cache, $props, $setup, $data, $options) {
 
 观察以上渲染函数，你会发现 click 事件节点为静态节点（HOISTED 为 -1），即不需要每次重新渲染。
 
-**9\. Diff算法优化**
+#### [vue2双端比较](https://sanhua0121.github.io/#/wudi/vue?id=vue2双端比较)
 
-搬运 Vue3 patchChildren 源码。结合上文与源码，patchFlag 帮助 diff 时区分静态节点，以及不同类型的动态节点。一定程度地减少节点本身及其属性的比对。
+所谓`双端比较`就是**新列表**和**旧列表**两个列表的头与尾互相对比，，在对比的过程中指针会逐渐向内靠拢，直到某一个列表的节点全部遍历过，对比停止。
 
-```
-function patchChildren(n1, n2, container, parentAnchor, parentComponent, parentSuspense, isSVG, optimized) {
-  // 获取新老孩子节点
-  const c1 = n1 && n1.children
-  const c2 = n2.children
-  const prevShapeFlag = n1 ? n1.shapeFlag : 0
-  const { patchFlag, shapeFlag } = n2
-  
-  // 处理 patchFlag 大于 0 
-  if(patchFlag > 0) {
-    if(patchFlag && PatchFlags.KEYED_FRAGMENT) {
-      // 存在 key
-      patchKeyedChildren()
-      return
-    } els if(patchFlag && PatchFlags.UNKEYED_FRAGMENT) {
-      // 不存在 key
-      patchUnkeyedChildren()
-      return
-    }
-  }
-  
-  // 匹配是文本节点（静态）：移除老节点，设置文本节点
-  if(shapeFlag && ShapeFlags.TEXT_CHILDREN) {
-    if (prevShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-      unmountChildren(c1 as VNode[], parentComponent, parentSuspense)
-    }
-    if (c2 !== c1) {
-      hostSetElementText(container, c2 as string)
-    }
-  } else {
-    // 匹配新老 Vnode 是数组，则全量比较；否则移除当前所有的节点
-    if (prevShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-      if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-        patchKeyedChildren(c1, c2, container, anchor, parentComponent, parentSuspense,...)
-      } else {
-        unmountChildren(c1 as VNode[], parentComponent, parentSuspense, true)
-      }
-    } else {
-      
-      if(prevShapeFlag & ShapeFlags.TEXT_CHILDREN) {
-        hostSetElementText(container, '')
-      } 
-      if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-        mountChildren(c2 as VNodeArrayChildren, container,anchor,parentComponent,...)
-      }
-    }
-  }
-}
+我们先用四个指针指向两个列表的头尾
+
+```js
+function vue2Diff(prevChildren, nextChildren, parent) {
+  let oldStartIndex = 0,
+    oldEndIndex = prevChildren.length - 1
+    newStartIndex = 0,
+    newEndIndex = nextChildren.length - 1;
+  let oldStartNode = prevChildren[oldStartIndex],
+    oldEndNode = prevChildren[oldEndIndex],
+    newStartNode = nextChildren[nextStartIndex],
+    newEndNode = nextChildren[nextEndIndex];
+}CopyErrorCopied
 ```
 
-patchUnkeyedChildren 源码如下所示。
+我们根据四个指针找到四个节点，然后进行对比，那么如何对比呢？我们按照以下四个步骤进行对比
 
-```
-function patchUnkeyedChildren(c1, c2, container, parentAnchor, parentComponent, parentSuspense, isSVG, optimized) {
-  c1 = c1 || EMPTY_ARR
-  c2 = c2 || EMPTY_ARR
-  const oldLength = c1.length
-  const newLength = c2.length
-  const commonLength = Math.min(oldLength, newLength)
-  let i
-  for(i = 0; i < commonLength; i++) {
-    // 如果新 Vnode 已经挂载，则直接 clone 一份，否则新建一个节点
-    const nextChild = (c2[i] = optimized ? cloneIfMounted(c2[i] as Vnode)) : normalizeVnode(c2[i])
-    patch()
-  }
-  if(oldLength > newLength) {
-    // 移除多余的节点
-    unmountedChildren()
-  } else {
-    // 创建新的节点
-    mountChildren()
-  }
- 
-}
-```
+1. 使用**旧列表**的头一个节点`oldStartNode`与**新列表**的头一个节点`newStartNode`对比
+2. 使用**旧列表**的最后一个节点`oldEndNode`与**新列表**的最后一个节点`newEndNode`对比
+3. 使用**旧列表**的头一个节点`oldStartNode`与**新列表**的最后一个节点`newEndNode`对比
+4. 使用**旧列表**的最后一个节点`oldEndNode`与**新列表**的头一个节点`newStartNode`对比
 
-**10\. 打包优化**
+使用以上四步进行对比，去寻找`key`相同的可复用的节点，当在某一步中找到了则停止后面的寻找。
+
+##### [非理想情况](https://sanhua0121.github.io/#/wudi/vue?id=非理想情况)
+
+有一种特殊情况，当四次对比都**没找到**复用节点时，我们只能拿**新列表**的第一个节点去**旧列表**中找与其`key`相同的节点
+
+找节点的时候其实会有两种情况：一种在**旧列表**中找到了，另一种情况是没找到
+
+当我们在旧列表中找到对应的`VNode`，我们只需要将找到的节点的`DOM`元素，移动到开头就可以了。这里的逻辑其实和`第四步`的逻辑是一样的，只不过`第四步`是移动的尾节点，这里是移动找到的节点。`DOM`移动后，由我们将**旧列表**中的节点改为`undefined`，这是**至关重要**的一步，因为我们已经做了节点的移动了所以我们不需要进行再次的对比了。最后我们将头指针`newStartIndex`向后移一位
+
+如果在**旧列表**中没有找到复用节点，直接创建一个新的节点放到最前面就可以了，然后后**移头指针`newStartIndex`**。
+
+最后当**旧列表**遍历到`undefind`时就跳过当前节点。
+
+#### [vue3 最长递增子序列](https://sanhua0121.github.io/#/wudi/vue?id=vue3-最长递增子序列)
+
+### [vue3的优化](https://sanhua0121.github.io/#/wudi/vue?id=vue3的优化)
+
+事件缓存：将事件缓存，可以理解为变成静态的了
+
+添加静态标记：Vue2 是全量 Diff，Vue3 是静态标记 + 非全量 Diff
+
+静态提升：创建静态节点时保存，后续直接复用
+
+使用最长递增子序列优化了对比流程：Vue2 里在 updateChildren() 函数里对比变更，在 Vue3 里这一块的逻辑主要在 patchKeyedChildren() 函数里，具体看下面
+
+在 Vue2 里 `updateChildren` 会进行
+
+- 头和头比
+- 尾和尾比
+- 头和尾比
+- 尾和头比
+- 都没有命中的对比
+
+在 Vue3 里 `patchKeyedChildren` 为
+
+- 头和头比
+- 尾和尾比
+- 基于最长递增子序列进行移动/添加/删除
+
+看个例子，比如
+
+- 老的 children：`[ a, b, c, d, e, f, g ]`
+- 新的 children：`[ a, b, f, c, d, e, h, g ]`
+
+1. 先进行头和头比，发现不同就结束循环，得到 `[ a, b ]`
+2. 再进行尾和尾比，发现不同就结束循环，得到 `[ g ]`
+3. 再保存没有比较过的节点 `[ f, c, d, e, h ]`，并通过 newIndexToOldIndexMap 拿到在数组里对应的下标，生成数组 `[ 5, 2, 3, 4, -1 ]`，`-1` 是老数组里没有的就说明是新增
+4. 然后再拿取出数组里的最长递增子序列，也就是 `[ 2, 3, 4 ]` 对应的节点 `[ c, d, e ]`
+5. 然后只需要把其他剩余的节点，基于 `[ c, d, e ]` 的位置进行移动/新增/删除就可以了
+
+**打包优化**
 
 Tree-shaking：模块打包 webpack、rollup 等中的概念。移除 JavaScript 上下文中未引用的代码。主要依赖于 import 和 export 语句，用来检测代码模块是否被导出、导入，且被 JavaScript 文件使用。
 
