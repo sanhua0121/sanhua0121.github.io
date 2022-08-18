@@ -9,7 +9,7 @@
 * 框架
   * [Vue.js](/wudi/vue.md)
   * [React.js](/wudi/react.md)
-  * [三画项目](wudi//三画项目面.md)
+  * [三画项目](wudi/三画项目面.md)
   * [webgis](wudi/webgis.md)  
   * 可视化
      * [canvas](wudi/HTML5-Canvas.md)
