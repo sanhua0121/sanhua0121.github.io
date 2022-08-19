@@ -6838,7 +6838,7 @@ key 是为 Vue 中 vnode 的唯一标记，通过这个 key，diff 操作可以�
 
 
 
-# vue源码分析
+# vue框架分析与源码
 
 ## Vue2 完整的生命周期
 
