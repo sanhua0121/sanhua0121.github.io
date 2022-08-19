@@ -21,10 +21,10 @@
   * [Webpack5](/wudi/webpack5.md)
   * [Node.js](/wudi/node.js.md)
   * [Axios](wudi/axios.md)
-  * [浏览器原理](wudi/浏览器.md)
   * [Websocket原理](wudi/Websocket%E5%8E%9F%E7%90%86%E5%8F%8A%E5%85%B7%E4%BD%93%E4%BD%BF%E7%94%A8%EF%BC%88ws%2Bsocket.io%EF%BC%89%20-%20%E6%8E%98%E9%87%91.md)
 * 综合
   * [计算机网络](wudi/网络.md)
+  * [浏览器原理](wudi/浏览器.md)
   * [数据结构与算法](wudi/数据结构与算法基础.md)
   * [性能优化](wudi/性能优化.md)
   * [设计模式](wudi/设计模式.md)
