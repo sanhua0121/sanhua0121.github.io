@@ -39,7 +39,7 @@ webpack解决了什么问题？
 - Mode：模式，告知 webpack 使用相应模式的内置优化
 - Browser Compatibility：浏览器兼容性，Webpack 支持所有符合 ES5 标准 的浏览器（IE8以上版本）
 
-![img](https://s2.loli.net/2022/07/28/Gve1RziaKNVSuDw.webp)
+![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/sanhuaImgssanhuaImgssanhuaImgsGve1RziaKNVSuDw.webp)
 
 #### loader特点
 
@@ -375,7 +375,7 @@ module.exports = {
 
 **用途：可以用来开发统一的图标管理库**
 
-![svg-sprite-loader.png](https://s2.loli.net/2022/07/28/RsF5XpgqPEwGhA2.webp)
+![svg-sprite-loader.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/RsF5XpgqPEwGhA2.webp)
 
 **示例代码：**
 
@@ -3178,7 +3178,7 @@ export const age = "title_age";
 5. 加载完，就去执行这段jsonp，主要就是把moduleId和module内容存到modules数组中，然后再去走webpack内置的require。
 
 6. webpack内置的require，主要是先判断缓存，这个moduleId是否缓存过了，如果缓存过了，就直接返回。如果没有缓存，再继续往下走，也就是加载module内容，然后最终内容会挂在都module,exports上，返回module.exports就返回了引用文件的最终执行结果。
-  
+
 
 - 入口文件
 
