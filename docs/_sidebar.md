@@ -10,6 +10,7 @@
   * [Vue.js](/wudi/vue.md)
   * [React.js](/wudi/react.md)
   * [三画项目](wudi/三画项目面.md)
+  * [实习相关](wudi/%E5%AE%9E%E4%B9%A0%E7%9B%B8%E5%85%B3.md.md)
   * [webgis](wudi/webgis.md)  
   * 可视化
      * [canvas](wudi/HTML5-Canvas.md)
