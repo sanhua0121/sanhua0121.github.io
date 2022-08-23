@@ -14,11 +14,11 @@
   * [webgis](wudi/webgis.md)  
   * 可视化
      * [canvas](wudi/HTML5-Canvas.md)
-     * [svg](wudi//SVG入门指南.md)
-     * [webgl](wudi//webgl.md)
+     * [svg](wudi/SVG入门指南.md)
+     * [webgl](wudi/webgl.md)
      * [three.js&d3.js](wudi//three.js&d3.js.md)
 * 进阶
-  * [Webpack](/wudi/webpack1.md)
+  * [Webpack1](wudi/webpack1.md)
   * [Webpack5](/wudi/webpack5.md)
   * [Node.js](/wudi/node.js.md)
   * [Axios](wudi/axios.md)
