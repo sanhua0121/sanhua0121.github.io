@@ -39,7 +39,7 @@ webpack解决了什么问题？
 - Mode：模式，告知 webpack 使用相应模式的内置优化
 - Browser Compatibility：浏览器兼容性，Webpack 支持所有符合 ES5 标准 的浏览器（IE8以上版本）
 
-<img src="https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201840522.webp" alt="img" style="zoom:50%;" />
+<img src="https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201840522.webp" alt="img" style="zoom:50%;" />
 
 #### loader特点
 
@@ -375,7 +375,7 @@ module.exports = {
 
 **用途：可以用来开发统一的图标管理库**
 
-![svg-sprite-loader.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs202208201817093.webp)
+![svg-sprite-loader.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/imgs202208201817093.webp)
 
 **示例代码：**
 
@@ -518,11 +518,11 @@ module.exports = {
 
 `vue-lodaer` 现将读取的源文件，然后通过 `@vue/component-compiler-utils`中的 `parse` 解析器将得到源文件的描述符。对每个 `block` 进行处理，生成对应的模块请求。由 `normalizer` 函数把每个 `block` 拼接到一起，形成一个 `vue` 组件
 
-![vue-loader1.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201840750.webp)
+![vue-loader1.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201840750.webp)
 
 第二个阶段：通过 `pitcher-loader`(这个`loader`是通过 `vueloaderplugin`注入到`webpack`中的) 将第一阶段中间产物转化为另一阶段产物
 
-![vue-loader2.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201841133.webp)
+![vue-loader2.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201841133.webp)
 
 通过 `pitcher-loader`(这个`loader`是通过 `vueloaderplugin`注入到`webpack`中的) 将第一阶段中间产物转化为另一阶段产物。 就以 `import { render, staticRenderFns } from "./test.vue?vue&type=template&id=13429420&scoped=true&"` 为例，会被转化为 `-!./lib/vue-loader/loaders/templateLoader.js??vue-loader-options!./lib/vue-loader/index.js??vue-loader-options!./test.vue?vue&type=template&id=13429420&scoped=true&`
 
@@ -532,7 +532,7 @@ module.exports = {
 
 第三个阶段：第二阶段转化 `request` 请求，通过对应的 `loader` 进行处理
 
-![vue-loader3.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201841161.webp)
+![vue-loader3.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201841161.webp)
 
 在得到上述的`request` 之后，`webpack`会先使用`vue-loader`处理，然后再使用`template-loader`来处理，然后得到最后模块
 
@@ -808,7 +808,7 @@ module.exports = {
 
 最终效果：
 
-![analyzer.gif](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201834680.webp)
+![analyzer.gif](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201834680.webp)
 
 ##### 8. SplitChunksPlugin
 
@@ -865,7 +865,7 @@ module.exports = {
 
 `__webpack_require__`模块引入函数，我们在模块化开发的时候，通常会使用`ES Module`或者`CommonJS`规范导出/引入依赖模块，`webpack`打包编译的时候，会统一替换成自己的`__webpack_require__`来实现模块的引入和导出，从而实现模块缓存机制，以及抹平不同模块规范之间的一些差异性
 
-![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201834433.png)
+![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201834433.png)
 
 工作流程
 
@@ -1186,11 +1186,11 @@ exports.chunk2=chunk2;
 
 #### 热更新原理
 
-![image-20220330160910633](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201835657.png)
+![image-20220330160910633](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201835657.png)
 
 `HMR`即`Hot Module Replacement`是指当你对代码修改并保存后，`webpack`将会对代码进行重新打包，并将改动的模块发送到浏览器端，浏览器用新的模块替换掉旧的模块，去实现局部更新页面而非整体刷新页面。
 
-![core](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201835072.webp)
+![core](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201835072.webp)
 
 如上图所示，右侧`Server`端使用`webpack-dev-server`去启动本地服务，内部实现主要使用了`webpack`、`express`、`websocket`。
 
@@ -1260,7 +1260,7 @@ devServer.proxy可以代理开发环境中的url
 
 devServer中的proxy就相当于charles进行url的代理，在`sxx()`执行后发送的请求是`http://0.0.0.0:8080/robot/send?XXXXXXXX`，我们是在0.0.0.0:8080下，当然不会限制这样的请求的发送，然后devServer的proxy通过配置将host更改为`oapi.dingtalk.com`，该请求就能正常进行
 
-![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201835425.webp)
+![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201835425.webp)
 
 ```js
 proxy: {
@@ -1397,7 +1397,7 @@ Webpack 中，Tree-shaking 的实现一是先**标记**出模块导出值中哪�
 
 ### 7.webpack 中，module，chunk 和 bundle 的区别是什么？
 
-![image-20200518210532171](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201835066.png)
+![image-20200518210532171](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201835066.png)
 
 看这个图就很明白了：
 
@@ -1920,7 +1920,7 @@ babel 是 source to source 的转换，整体编译流程分为三步：
 - transform：遍历 AST，调用各种 transform 插件对 AST 进行增删改
 - generate：把转换后的 AST 打印成目标代码，并生成 sourcemap
 
-![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201835440.webp)
+![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201835440.webp)
 
 ##### 为什么 babel 的编译流程会分 parse、transform、generate 这 3 步呢？
 
@@ -1944,19 +1944,19 @@ parse 阶段的目的是把源码字符串转换成机器能够理解的 AST，�
 
 之后要把 token 进行递归的组装，生成 AST，这个过程是语法分析，按照不同的语法结构，来把一组单词组合成对象，比如声明语句、赋值表达式等都有对应的 AST 节点。
 
-![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201835693.webp)
+![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201835693.webp)
 
 ###### transform
 
 transform 阶段是对 parse 生成的 AST 的处理，会进行 AST 的遍历，遍历的过程中处理到不同的 AST 节点会调用注册的相应的 visitor 函数，visitor 函数里可以对 AST 节点进行增删改，返回新的 AST（可以指定是否继续遍历新生成的 AST）。这样遍历完一遍 AST 之后就完成了对代码的修改。
 
-![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201842643.webp)
+![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201842643.webp)
 
 ###### generate
 
 generate 阶段会把 AST 打印成目标代码字符串，并且会生成 sourcemap。不同的 AST 对应的不同结构的字符串。比如 `IfStatement` 就可以打印成 `if(test) {}` 格式的代码。这样从 AST 根节点进行递归的字符串拼接，就可以生成目标代码的字符串。
 
-![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201842150.webp)
+![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201842150.webp)
 
 sourcemap 记录了源码到目标代码的转换关系，通过它我们可以找到目标代码中每一个节点对应的源码位置，用于调试的时候把编译后的代码映射回源码，或者线上报错的时候把报错位置映射到源码。
 
@@ -2144,11 +2144,11 @@ vite的特点
 
 webpack dev server 在启动时需要先build一遍，而这个过程需要消耗很多时间
 
-![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201843513.webp)
+![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201843513.webp)
 
 而Vite 不同的是 执行vite serve 时，内部直接启动了web Server, 并不会先编译所有的代码文件。
 
-![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201843092.webp)
+![img](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201843092.webp)
 
 但是webpack 这类工具的做法是将所有模块提前编译、打包进bundle里，换句话说，不管模块是否会被执行，都要被编译和打包到bundle里。随着项目越来越大，打包后的bundle也越来越大，打包的速度自然会越来越慢。
 
@@ -2261,7 +2261,7 @@ Vite在冷启动的时候，将代码分为依赖和源码两部分，源码部�
 
 1.  语言优势，Esbuild使用Go语言开发，相对于JavaScript，Go语言是一种编译型语言，在编译阶段就已经将源码转译为机器码。
 
-![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201843138.webp) 2. 多线程，Rollup和webpack都没有使用多线程的能力，而Esbuild在算法上进行了大量的优化，充分的利用了多CPU的优势。
+![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201843138.webp) 2. 多线程，Rollup和webpack都没有使用多线程的能力，而Esbuild在算法上进行了大量的优化，充分的利用了多CPU的优势。
 
 以上这些原因，导致Esbuild构建模块的速度比webpack快到10-100倍。
 
@@ -2269,7 +2269,7 @@ Vite在冷启动的时候，将代码分为依赖和源码两部分，源码部�
 
 以我们上面的读技术文章的例子来看，我们不关心webpack，Rollup和Parcel相关链接的内容是什么，这些内容不影响我们阅读当前的文章，只有当我们需要使用到相关链接内容的时候，我们才去点击链接查看对应的内容。
 
-<img src="https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201843429.webp" alt="image.png" style="zoom:150%;" />
+<img src="https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201843429.webp" alt="image.png" style="zoom:150%;" />
 
 这两方面加起来，让Vite的冷启动快到不可思议。
 
@@ -2289,7 +2289,7 @@ Vite在冷启动的时候，将代码分为依赖和源码两部分，源码部�
 
 ### 13.如何进行css的抽离
 
-![在这里插入图片描述](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201843447.png)
+![在这里插入图片描述](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201843447.png)
 
 **直接引用样式文件，没有使用任何相关插件时，会出现`css in js`的情况，即打包到了一块**
 
@@ -2469,7 +2469,7 @@ plugins: [
 
 ##### 使用DllPlugin
 
-![在这里插入图片描述](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201843616.png)
+![在这里插入图片描述](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201843616.png)
 
 就是通过将引入的模块，打到一个dll文件下，生成模块包和整体包产物文件的对应关系，再次打包时，如果能在映射关系中找到该模块，便直接使用产物中的包，不在进行模块分割打包，以此来提高Webpack的打包速度。
 
@@ -2822,11 +2822,11 @@ module.exports = {
 
 到目前为止一切准备就绪，我们在根目录执行`webpack`命令：
 
-![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201844678.webp)
+![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201844678.webp)
 
 可以看到生成了一个`dist`文件夹，里面有一个`index.js`的文件，让我们来看看它究竟是什么。因为打包后的代码粗略的看上去，非常的凌乱，所以我这里把大部分注释先给去掉。我们将代码分为三部分来看：
 
-![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201844432.webp)
+![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201844432.webp)
 
 #### 第一部分
 
@@ -2848,7 +2848,7 @@ var __webpack_modules__ = {
 
 首先，我们可以看到它是一个`自执行函数`，能看到有一个`__webpack_modules__`的对象，他就是我们写的所有的模块（上面的`index.js`和`module1.js`）的一个集合。这个对象的键名是`引用路径`，值则是一个函数，这个函数有三个入参`module`、`__unused_webpack_exports`、`__webpack_require__`，函数体里面则是一个`eval`函数执行了我们写的代码。其实我们的js文件，被`webpack`加工打包了一层函数上去：
 
-![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201844994.webp)
+![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201844994.webp)
 
 `webpack`会把我们写的所有的**js文件打包成一个函数**，这样我们的js文件就是在一个**函数作用域下面的，不会污染全局环境**。再在打包之后，赋值给一个`__webpack_modules__`对象，把所有的模块引入。
 
@@ -2969,11 +2969,11 @@ export default {
 
 让我们结合打包后的代码来看下，我们看下编译前后的`index.js`：
 
-![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201844920.webp)
+![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201844920.webp)
 
 再看看编译前后的`module1.js`：
 
-![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201845808.webp)
+![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201845808.webp)
 
 #### 总结
 
@@ -2981,13 +2981,13 @@ export default {
 
 在值的导出的部分，`CommonJS`使用的是赋值操作，也就是拷贝了导出对象的引用地址：
 
-![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201845525.webp)
+![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201845525.webp)
 
 这样做会产生的影响是，其模块内部改变这个值，是影响不到导出结果的。**因为导出的是这个值的拷贝，两个值不是同一个！**
 
 而`ES6Module`的导出，我们来看一个更为直观的栗子：
 
-![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201845728.webp)
+![image.png](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201845728.webp)
 
 `ES6Module`的导出，并不是直接赋值，而是导出一个函数，这个**函数引用的是模块内部值，这样就导致了模块内部改变其中一个值，导出模块的值也会发生改变，因为两个值都是同一个！**
 
@@ -3692,19 +3692,19 @@ import(/* webpackChunkName: "title" */ "./components/Title")
         -   然后会发现，原先按需加载的权重应该是Low，但是现在变成了Hight(图1-3)
         -   从html发现，还没点击按钮，已经插入了link标签，也就是资源已经被预先加载了(图1-4)
 
-![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201847694.png)
+![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201847694.png)
 
  (图1-1)
 
-![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201847260.png)
+![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201847260.png)
 
  (图1-2)
 
-![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201848667.png)
+![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201848667.png)
 
 (图1-3)
 
-![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201848412.png)
+![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201848412.png)
 
 (图1-4)
 
@@ -3761,7 +3761,7 @@ button.addEventListener('click', () => {
 
   -   答：在page3.js中。因为如果一个模块被两个或两个以上引用，那么会单独打包出一个bundle，如果只有被一个引用，那么就会打包到引用方的包中。
 
-![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201848772.png)
+![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201848772.png)
 
 - 分包是什么意思？
 
@@ -3942,15 +3942,15 @@ module.exports =smw.wrap({
 
 -   结果：可以看到每个步骤、每个loader、plugin等消耗的时间
 
-![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201849168.png)
+![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201849168.png)
 
 #### 2.webpack-bundle-analyzer
 
 > webpack-bundle-analyzer是一个webpack的插件，需要配合webpack和webpack-cli一起使用。这个插件的功能是生成代码分析报告，帮助提升代码质量和网站性能
 
-![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201849571.png)
+![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201849571.png)
 
-![](https://s2.loli.net/2022/07/28/7XOjSzcsCxD45Zu.png)
+![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/7XOjSzcsCxD45Zu.png)
 
 上面这个插件的用法改了
 
@@ -3962,7 +3962,7 @@ const SpeedMeasureWebpackPlugin = require('speed-measure-webpack-plugin');const 
 
 -   可以看到每个步骤、每个loader、plugin等消耗的时间
 
-![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/imgs/202208201849748.png)
+![](https://femarkdownpicture.oss-cn-qingdao.aliyuncs.com/sanhuaImgs/202208201849748.png)
 
 #### webpack打包文件分析工具webpack-bundle-analyzer
 
