@@ -12,6 +12,8 @@
   * [三画项目](wudi/三画项目面.md)
   * [实习相关](wudi/%E5%AE%9E%E4%B9%A0%E7%9B%B8%E5%85%B3.md.md)
   * [webgis](wudi/webgis.md)  
+  * [ruoyi前端](wudi/Ruoyi%E6%A1%86%E6%9E%B6%E5%89%8D%E5%90%8E%E7%AB%AF%E4%BA%A4%E4%BA%92%E7%9A%84%E6%95%B4%E4%B8%AA%E6%B5%81%E7%A8%8B%20-%E5%89%8D%E7%AB%AF%20-%20%E6%8E%98%E9%87%91.md)  
+  * [ruoyi后端](wudi/Ruoyi%E6%A1%86%E6%9E%B6%E5%89%8D%E5%90%8E%E7%AB%AF%E4%BA%A4%E4%BA%92%E7%9A%84%E6%95%B4%E4%B8%AA%E6%B5%81%E7%A8%8B%20-%E5%90%8E%E7%AB%AF%20-%20%E6%8E%98%E9%87%91.md)  
   * 可视化
      * [canvas](wudi/HTML5-Canvas.md)
      * [svg](wudi/SVG入门指南.md)
