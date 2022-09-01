@@ -7825,6 +7825,59 @@ react可以通过高阶组件（Higher Order Components-- HOC）来扩展，而v
 
 那么，Vue 这种精确的更新是怎么做的呢？其实每个组件都有自己的`渲染 watcher`，它掌管了当前组件的视图更新，但是并不会掌管 `ChildComponent` 的更新。
 
+## [优化的Diff算法](https://sanhua0121.github.io/#/wudi/三画项目面?id=优化的diff算法)
+
+vue和react的虚拟DOM的diff算法大致相同，其核心是基于两个简单的假设:
+
+1. 两个相同的组件产生类似的DOM结构，不同的组件产生不同的DOM结构
+2. 同一层级的一组节点，他们可以通过唯一的id进行区分
+
+### [React优化Diff算法](https://sanhua0121.github.io/#/wudi/三画项目面?id=react优化diff算法)
+
+> 基于以上优化的diff三点策略，react分别进行以下算法优化
+
+- tree diff
+- component diff
+- element diff
+
+###### [tree diff](https://sanhua0121.github.io/#/wudi/三画项目面?id=tree-diff)
+
+react对树的算法进行了分层比较。react 通过 updateDepth对Virtual Dom树进行层级控制，只会对相同层级的节点进行比较，即同一个父节点下的所有子节点。当发现节点不存在，则该节点和其子节点都会被删除。这样是需要遍历一次dom树，就完成了整个dom树的对比
+
+###### [component diff](https://sanhua0121.github.io/#/wudi/三画项目面?id=component-diff)
+
+- 如果是同类型的组件，则直接对比virtual Dom tree
+- 如果不是同类型的组件，会直接替换掉组件下的所有子组件
+- 如果类型相同，但是可能virtual DOM 没有变化，这种情况下我们可以使用shouldComponentUpdate() 来判断是否需要进行diff
+
+###### [**element diff**](https://sanhua0121.github.io/#/wudi/三画项目面?id=element-diff)
+
+移动优化
+在移动前，会将节点在新集合中的位置和在老集合中lastIndex进行比较，如果if (child._mountIndex < lastIndex) 进行移动操作，否则不进行移动操作。这是一种顺序移动优化。只有在新集合的位置 小于 在老集合中的位置 才进行移动。
+
+如果遍历的过程中，发现在新集合中没有，但是在老集合中的节点，会进行删除操作
+
+所以：element diff 通过唯一key 进行diff 优化。
+
+### [Vue优化Diff](https://sanhua0121.github.io/#/wudi/三画项目面?id=vue优化diff)
+
+差异就在于, diff的过程就是调用patch函数，就像打补丁一样修改真实dom
+
+- patchVnode
+- updateChildren
+- updateChildren是vue diff的核心 过程可以概括为：oldCh和newCh各有两个头尾的变量StartIdx和EndIdx，它们的2个变量相互比较，一共有4种比较方式。如果4种比较都没匹配，如果设置了key，就会用key进行比较，在比较的过程中，变量会往中间靠，一旦StartIdx>EndIdx表明oldCh和newCh至少有一个已经遍历完了，就会结束比较
+
+#### [Vue 2.x vs Vue 3.x](https://sanhua0121.github.io/#/wudi/三画项目面?id=vue-2x-vs-vue-3x)
+
+Vue2的核心Diff算法采用了双端比较的算法，同时从新旧children的两端开始进行比较，借助key值找到可复用的节点，再进行相关操作。相比React的Diff算法，同样情况下可以减少移动节点次数，减少不必要的性能损耗，更加的优雅
+
+Vue3.x借鉴了 ivi算法和 inferno算法。在创建VNode时就确定其类型，以及在mount/patch的过程中采用位运算来判断一个VNode的类型，在这个基础之上再配合核心的Diff算法，使得性能上较Vue2.x有了提升。(实际的实现可以结合Vue3.x源码看
+
+下面的diff算法中会出现几个方法，在这里进行罗列，并说明其功能
+
+- `mount(vnode, parent, [refNode])`: 通过`vnode`生成真实的`DOM`节点。`parent`为其父级的真实DOM节点，`refNode`为真实的`DOM`节点，其父级节点为`parent`。如果`refNode`不为空，`vnode`生成的`DOM`节点就会插入到`refNode`之前；如果`refNode`为空，那么`vnode`生成的`DOM`节点就作为最后一个子节点插入到`parent`中
+- `patch(prevNode, nextNode, parent)`: 可以简单的理解为给当前`DOM`节点进行更新，并且调用`diff`算法对比自身的子节点;
+
 ## Demo实现
 
 
