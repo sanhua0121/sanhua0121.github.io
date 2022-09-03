@@ -25,7 +25,7 @@
   * [Node.js](/wudi/node.js.md)
   * [Axios](wudi/axios.md)
   * [Websocket原理](wudi/Websocket%E5%8E%9F%E7%90%86%E5%8F%8A%E5%85%B7%E4%BD%93%E4%BD%BF%E7%94%A8%EF%BC%88ws%2Bsocket.io%EF%BC%89%20-%20%E6%8E%98%E9%87%91.md)
-  * [qiankun](/docs/wudi/%E5%BE%AE%E5%89%8D%E7%AB%AF%E6%A1%86%E6%9E%B6%20%E4%B9%8B%20qiankun%20%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%20-%20%E6%8E%98%E9%87%91.md)
+  * [qiankun](wudi/%E5%BE%AE%E5%89%8D%E7%AB%AF%E6%A1%86%E6%9E%B6%20%E4%B9%8B%20qiankun%20%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%20-%20%E6%8E%98%E9%87%91.md)
 * 综合
   * [计算机网络](wudi/网络.md)
   * [浏览器原理](wudi/浏览器.md)
