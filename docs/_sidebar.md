@@ -18,7 +18,7 @@
      * [canvas](wudi/HTML5-Canvas.md)
      * [svg](wudi/SVG入门指南.md)
      * [webgl](wudi/webgl.md)
-     * [three.js&d3.js](wudi//three.js&d3.js.md)
+     * [three.js&d3.js](wudi/three.js&d3.js.md)
 * 进阶
   * [Webpack5](/wudi/webpack5.md)
   * [Webpack](wudi/webpack.md)
